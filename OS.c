@@ -56,11 +56,11 @@ void SetInitialStack(int i){
 // output: none
 void OS_Init(void){
 	OS_DisableInterrupts();
-  PLL_Init();                 // set processor clock to 50 MHz
+  PLL_Init();                 // set processor clock to 80 MHz
   NVIC_ST_CTRL_R = 0;         // disable SysTick during setup
   NVIC_ST_CURRENT_R = 0;      // any write to current clears it
   NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R&0x00FFFFFF)|0xE0000000; // priority 7
-	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&0xFFFFFF0F)|0x000000E0; // PendSV priority 7
+	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&(~NVIC_SYS_PRI3_PENDSV_M))|(0x7 << NVIC_SYS_PRI3_PENDSV_S); // PendSV priority 7
 }
 
 // ******** OS_InitSemaphore ************
@@ -121,7 +121,7 @@ void OS_bSignal(Sema4Type *semaPt){
 // In Lab 3, you can ignore the stackSize fields
 int OS_AddThread(void(*task)(void), 
   unsigned long stackSize, unsigned long priority){
-	static uint32_t i=0;
+	static uint32_t i=0; 
 	long status = StartCritical();
 	if(i>NUMTHREADS-1){return 0;} //If max threads have been added return failure
 	tcbs[i].ID=i;
@@ -231,7 +231,7 @@ void OS_Kill(void){
 // input:  none
 // output: none
 void OS_Suspend(void){
-	;
+	NVIC_INT_CTRL_R = NVIC_INT_CTRL_R | NVIC_INT_CTRL_PEND_SV;
 }
  
 // ******** OS_Fifo_Init ************
