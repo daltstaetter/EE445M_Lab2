@@ -9,8 +9,8 @@
 #include <stdint.h>
 #include "PLL.h"
 #include "TIMER.h"
-
-#define SYSTICK
+#include "ifdef.h"
+//#define SYSTICK // defined in ifdef.h
 
 // function definitions in osasm.s
 void OS_DisableInterrupts(void); // Disable interrupts
