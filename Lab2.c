@@ -34,6 +34,7 @@
 #define TASKS
 #define DEBUG
 
+
 #ifdef TASKS
 //*********Prototype for FFT in cr4_fft_64_stm32.s, STMicroelectronics
 void cr4_fft_64_stm32(void *pssOUT, void *pssIN, unsigned short Nbin);
@@ -375,7 +376,7 @@ void Thread3(void){
   }
 }
 
-int main(void){  // Testmain1
+int Testmain1(void){  // Testmain1
   OS_Init();          // initialize, disable interrupts
   PortE_Init();       // profile user threads
   NumCreated = 0 ;
@@ -739,7 +740,7 @@ void Thread8(void){       // only thread running
     PE0 ^= 0x01;      // debugging profile  
   }
 }
-int Testmain7(void){       // Testmain7
+int main(void){       // Testmain7
   PortE_Init();
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;

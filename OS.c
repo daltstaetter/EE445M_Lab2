@@ -10,6 +10,8 @@
 #include "PLL.h"
 #include "TIMER.h"
 
+#define SYSTICK
+
 // function definitions in osasm.s
 void OS_DisableInterrupts(void); // Disable interrupts
 void OS_EnableInterrupts(void);  // Enable interrupts
@@ -57,10 +59,12 @@ void SetInitialStack(int i){
 void OS_Init(void){
 	OS_DisableInterrupts();
   PLL_Init();                 // set processor clock to 80 MHz
+	#ifdef SYSTICK
   NVIC_ST_CTRL_R = 0;         // disable SysTick during setup
-  NVIC_ST_CURRENT_R = 0;      // any write to current clears it
   NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R&0x00FFFFFF)|0xE0000000; // priority 7
+	#endif
 	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&(~NVIC_SYS_PRI3_PENDSV_M))|(0x7 << NVIC_SYS_PRI3_PENDSV_S); // PendSV priority 7
+	//NVIC_SYS_HND_CTRL_R |= NVIC_SYS_HND_CTRL_PNDSV; //enable PendSV
 }
 
 // ******** OS_InitSemaphore ************
@@ -123,13 +127,15 @@ int OS_AddThread(void(*task)(void),
   unsigned long stackSize, unsigned long priority){
 	static uint32_t i=0; 
 	long status = StartCritical();
-	if(i>NUMTHREADS-1){return 0;} //If max threads have been added return failure
+	if(i>NUMTHREADS){return 0;} //If max threads have been added return failure
 	tcbs[i].ID=i;
 	tcbs[i].Priority=priority;
 	tcbs[i].SleepCtr=0;
 	if(i>0){
 		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
 		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
+	}else{
+		tcbs[0].next=&tcbs[0];
 	}
   SetInitialStack(i); 
 	Stacks[i][stackSize-2] = (int32_t)(task); // PC
@@ -231,7 +237,11 @@ void OS_Kill(void){
 // input:  none
 // output: none
 void OS_Suspend(void){
-	NVIC_INT_CTRL_R = NVIC_INT_CTRL_R | NVIC_INT_CTRL_PEND_SV;
+	uint32_t sysreg;
+	long sr = StartCritical();
+	sysreg= NVIC_SYS_HND_CTRL_R;
+	NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
+	EndCritical(sr);
 }
  
 // ******** OS_Fifo_Init ************
@@ -336,8 +346,11 @@ unsigned long OS_MsTime(void){;}
 // It is ok to limit the range of theTimeSlice to match the 24-bit SysTick
 void OS_Launch(unsigned long theTimeSlice){
 	RunPt = &tcbs[0];       // thread 0 will run first
+	#ifdef SYSTICK
+	NVIC_ST_CURRENT_R = 0;      // any write to current clears it
 	NVIC_ST_RELOAD_R = theTimeSlice - 1; // reload value
-  NVIC_ST_CTRL_R = NVIC_ST_CTRL_CLK_SRC|NVIC_ST_CTRL_COUNT|NVIC_ST_CTRL_INTEN; // enable, core clock and interrupt arm
+  NVIC_ST_CTRL_R = NVIC_ST_CTRL_ENABLE+NVIC_ST_CTRL_CLK_SRC+NVIC_ST_CTRL_INTEN;// enable, core clock and interrupt arm
+	#endif
   StartOS();                   // start on the first task
 }
 
