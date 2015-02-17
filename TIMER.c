@@ -1,7 +1,7 @@
 // Timer.c
 
 #include "TIMER.h"
-#include "inc/tm4c123gh6pm.h"
+#include "tm4c123gh6pm.h"
 
 
 void(*HandlerTaskArray[12])(void); // Holds the function pointers to the threads that will be launched

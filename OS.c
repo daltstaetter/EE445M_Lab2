@@ -10,6 +10,44 @@
 #include "PLL.h"
 #include "TIMER.h"
 
+// function definitions in osasm.s
+void OS_DisableInterrupts(void); // Disable interrupts
+void OS_EnableInterrupts(void);  // Enable interrupts
+int32_t StartCritical(void);
+void EndCritical(int32_t primask);
+void StartOS(void);
+#define NUMTHREADS 3
+#define STACKSIZE 128
+struct tcb{
+	int32_t *sp;
+	struct tcb *next;
+	int32_t ID;
+	int32_t SleepCtr;
+	int32_t Priority;
+};
+typedef struct tcb tcbType;
+tcbType tcbs[NUMTHREADS];
+tcbType *RunPt;
+int32_t Stacks[NUMTHREADS][STACKSIZE];
+
+void SetInitialStack(int i){
+  tcbs[i].sp = &Stacks[i][STACKSIZE-16]; // thread stack pointer
+  Stacks[i][STACKSIZE-1] = 0x01000000;   // thumb bit
+  Stacks[i][STACKSIZE-3] = 0x14141414;   // R14
+  Stacks[i][STACKSIZE-4] = 0x12121212;   // R12
+  Stacks[i][STACKSIZE-5] = 0x03030303;   // R3
+  Stacks[i][STACKSIZE-6] = 0x02020202;   // R2
+  Stacks[i][STACKSIZE-7] = 0x01010101;   // R1
+  Stacks[i][STACKSIZE-8] = 0x00000000;   // R0
+  Stacks[i][STACKSIZE-9] = 0x11111111;   // R11
+  Stacks[i][STACKSIZE-10] = 0x10101010;  // R10
+  Stacks[i][STACKSIZE-11] = 0x09090909;  // R9
+  Stacks[i][STACKSIZE-12] = 0x08080808;  // R8
+  Stacks[i][STACKSIZE-13] = 0x07070707;  // R7
+  Stacks[i][STACKSIZE-14] = 0x06060606;  // R6
+  Stacks[i][STACKSIZE-15] = 0x05050505;  // R5
+  Stacks[i][STACKSIZE-16] = 0x04040404;  // R4
+}
 
 // ******** OS_Init ************
 // initialize operating system, disable interrupts until OS_Launch
@@ -17,7 +55,12 @@
 // input:  none
 // output: none
 void OS_Init(void){
-	;
+	OS_DisableInterrupts();
+  PLL_Init();                 // set processor clock to 50 MHz
+  NVIC_ST_CTRL_R = 0;         // disable SysTick during setup
+  NVIC_ST_CURRENT_R = 0;      // any write to current clears it
+  NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R&0x00FFFFFF)|0xE0000000; // priority 7
+	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&0xFFFFFF0F)|0x000000E0; // PendSV priority 7
 }
 
 // ******** OS_InitSemaphore ************
@@ -77,16 +120,32 @@ void OS_bSignal(Sema4Type *semaPt){
 // In Lab 2, you can ignore both the stackSize and priority fields
 // In Lab 3, you can ignore the stackSize fields
 int OS_AddThread(void(*task)(void), 
-   unsigned long stackSize, unsigned long priority){
-		 ;
-	 }
+  unsigned long stackSize, unsigned long priority){
+	static uint32_t i=0;
+	long status = StartCritical();
+	if(i>NUMTHREADS-1){return 0;} //If max threads have been added return failure
+	tcbs[i].ID=i;
+	tcbs[i].Priority=priority;
+	tcbs[i].SleepCtr=0;
+	if(i>0){
+		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
+		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
+	}
+  SetInitialStack(i); 
+	Stacks[i][stackSize-2] = (int32_t)(task); // PC
+	i++;
+  EndCritical(status);
+  return 1;               // successful;
+}
 
 //******** OS_Id *************** 
 // returns the thread ID for the currently running thread
 // Inputs: none
 // Outputs: Thread ID, number greater than zero 
 unsigned long OS_Id(void){
-	;
+	long sr = StartCritical();
+	return RunPt->ID;
+	EndCritical(sr);
 }
 
 
@@ -275,7 +334,12 @@ unsigned long OS_MsTime(void){;}
 // In Lab 2, you can ignore the theTimeSlice field
 // In Lab 3, you should implement the user-defined TimeSlice field
 // It is ok to limit the range of theTimeSlice to match the 24-bit SysTick
-void OS_Launch(unsigned long theTimeSlice){;}
+void OS_Launch(unsigned long theTimeSlice){
+	RunPt = &tcbs[0];       // thread 0 will run first
+	NVIC_ST_RELOAD_R = theTimeSlice - 1; // reload value
+  NVIC_ST_CTRL_R = 0x00000007; // enable, core clock and interrupt arm
+  StartOS();                   // start on the first task
+}
 
 
 // Resets the 32-bit counter to zero
@@ -403,6 +467,5 @@ void PF3_Toggle(void)
 		GPIO_PORTF_DATA_R ^= 0x08;
 }
 
-
-
+void Jitter(void){;}
 

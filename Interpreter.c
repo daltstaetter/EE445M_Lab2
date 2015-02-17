@@ -35,7 +35,7 @@
 #include <rt_misc.h>
 #include <string.h>
 #include "OS.h"
-#define INTERPRETER
+//#define INTERPRETER
 
 struct __FILE { int handle; /* Add whatever you need here */ };
 FILE __stdout;
@@ -106,7 +106,7 @@ int main2(void){
 }
 #ifdef INTERPRETER
 uint16_t TestBuffer[64];
-int main(void){
+int InterpreterTestMain(void){
 	char input_str[30];
 	int input_num,i,device,line;
 	int freq, numSamples;

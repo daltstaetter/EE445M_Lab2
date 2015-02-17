@@ -101,7 +101,7 @@ unsigned long OS_Id(void);
 // In lab 3, this command will be called 0 1 or 2 times
 // In lab 3, there will be up to four background threads, and this priority field 
 //           determines the relative priority of these four threads
-int OS_AddPeriodicThread(void(*task)(void), 
+int OS_AddPeriodicThread(void(*task)(void), int timer, 
    unsigned long period, unsigned long priority);
 
 //******** OS_AddSW1Task *************** 
@@ -258,5 +258,7 @@ unsigned long OS_MsTime(void);
 // In Lab 3, you should implement the user-defined TimeSlice field
 // It is ok to limit the range of theTimeSlice to match the 24-bit SysTick
 void OS_Launch(unsigned long theTimeSlice);
+
+void Jitter(void);
 
 #endif
