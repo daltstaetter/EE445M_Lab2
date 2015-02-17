@@ -337,7 +337,7 @@ unsigned long OS_MsTime(void){;}
 void OS_Launch(unsigned long theTimeSlice){
 	RunPt = &tcbs[0];       // thread 0 will run first
 	NVIC_ST_RELOAD_R = theTimeSlice - 1; // reload value
-  NVIC_ST_CTRL_R = 0x00000007; // enable, core clock and interrupt arm
+  NVIC_ST_CTRL_R = NVIC_ST_CTRL_CLK_SRC|NVIC_ST_CTRL_COUNT|NVIC_ST_CTRL_INTEN; // enable, core clock and interrupt arm
   StartOS();                   // start on the first task
 }
 
