@@ -29,10 +29,11 @@
 #include "ADC.h"
 #include "UART.h"
 #include <string.h> 
+#include "ifdef.h"
 
-//#define INTERPRETER
-#define TASKS
-#define DEBUG
+//#define INTERPRETER // cleared in ifdef.h
+//#define TASKS // set in ifdef.h
+//#define DEBUG // set in ifdef.h
 
 
 #ifdef TASKS
