@@ -18,6 +18,7 @@ void OS_EnableInterrupts(void);  // Enable interrupts
 int32_t StartCritical(void);
 void EndCritical(int32_t primask);
 void StartOS(void);
+
 #define NUMTHREADS 3
 #define STACKSIZE 128
 struct tcb{
@@ -32,6 +33,10 @@ typedef struct tcb tcbType;
 tcbType tcbs[NUMTHREADS];
 tcbType *RunPt;
 int32_t Stacks[NUMTHREADS][STACKSIZE];
+
+volatile int mutex;
+volatile int RoomLeft;
+volatile int CurrentSize;
 
 void SetInitialStack(int i){
   tcbs[i].sp = &Stacks[i][STACKSIZE-16]; // thread stack pointer

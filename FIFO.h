@@ -31,6 +31,9 @@
 long StartCritical (void);    // previous I bit, disable interrupts
 void EndCritical(long sr);    // restore I bit to previous value
 
+extern volatile int mutex;
+extern volatile int RoomLeft;
+extern volatile int CurrentSize;
 
 
 // macro to create an index FIFO
