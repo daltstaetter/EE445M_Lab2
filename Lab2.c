@@ -404,11 +404,12 @@ void Thread1b(void){
     Count1++;
   }
 }
-void Thread2b(void){
+int Thread2b(void){
   Count2 = 0;          
   for(;;){
     PE1 ^= 0x02;       // heartbeat
     Count2++;
+		return 0;
   }
 }
 void Thread3b(void){
@@ -418,7 +419,7 @@ void Thread3b(void){
     Count3++;
   }
 }
-int Testmain2(void){  // Testmain2
+int main(void){  // Testmain2
   OS_Init();           // initialize, disable interrupts
   PortE_Init();       // profile user threads
   NumCreated = 0 ;
@@ -741,12 +742,12 @@ void Thread8(void){       // only thread running
     PE0 ^= 0x01;      // debugging profile  
   }
 }
-int main(void){       // Testmain7
+int Testmain7(void){       // Testmain7
   PortE_Init();
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
   NumCreated += OS_AddThread(&Thread8,128,2); 
-  OS_Launch(TIME_1MS/10); // 100us, doesn't return, interrupts enabled in here
+  OS_Launch(TIME_1MS/10); // 100us, doesn't return, interrupts enabled in here1111111111111111111111111111111111111111111111111
   return 0;             // this never executes
 }
 #endif
