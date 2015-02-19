@@ -398,29 +398,40 @@ int Testmain1(void){  // Testmain1
 // no ADC serial port or LCD output
 // no calls to semaphores
 void Thread1b(void){
+	int i;
   Count1 = 0;          
   for(;;){
-    PE0 ^= 0x01;       // heartbeat
+    //PE0 ^= 0x01;       // heartbeat
+		ST7735_Message (0, 0, "Thread ", 0);
     Count1++;
+		//for (i=0;i<10000;i++){}
   }
 }
 void Thread2b(void){
-  Count2 = 0;          
+  int i;
+	Count2 = 0;          
   for(;;){
-    PE1 ^= 0x02;       // heartbeat
+    //PE1 ^= 0x02;       // heartbeat
+		ST7735_Message (0, 1, "Thread ", 1);
     Count2++;
+		//for (i=0;i<10000;i++){}
   }
 }
 void Thread3b(void){
+	int i;
   Count3 = 0;          
   for(;;){
-    PE2 ^= 0x04;       // heartbeat
+    //PE2 ^= 0x04;       // heartbeat
+		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
+		//for (i=0;i<10000;i++){}
   }
 }
 int main(void){  // Testmain2
-  OS_Init();           // initialize, disable interrupts
-  PortE_Init();       // profile user threads
+	OS_Init();           // initialize, disable interrupts
+	OS_InitSemaphore(&LCDmutex,1);
+	Output_Init();
+  //PortE_Init();       // profile user threads
   NumCreated = 0 ;
   NumCreated += OS_AddThread(&Thread1b,128,1); 
   NumCreated += OS_AddThread(&Thread2b,128,2); 

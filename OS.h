@@ -22,6 +22,7 @@ struct  Sema4{
 // add other components here, if necessary to implement blocking
 };
 typedef struct Sema4 Sema4Type;
+extern Sema4Type LCDmutex;
 
 // ******** OS_Init ************
 // initialize operating system, disable interrupts until OS_Launch

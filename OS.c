@@ -37,6 +37,7 @@ int32_t Stacks[NUMTHREADS][STACKSIZE];
 volatile int mutex;
 volatile int RoomLeft;
 volatile int CurrentSize;
+Sema4Type LCDmutex;
 
 void SetInitialStack(int i){
   tcbs[i].sp = &Stacks[i][STACKSIZE-16]; // thread stack pointer
@@ -78,7 +79,7 @@ void OS_Init(void){
 // input:  pointer to a semaphore
 // output: none
 void OS_InitSemaphore(Sema4Type *semaPt, long value){
-	;
+	semaPt->Value=value;
 }
 
 
@@ -91,7 +92,7 @@ void OS_InitSemaphore(Sema4Type *semaPt, long value){
 void OS_Wait(Sema4Type *semaPt){
 	
 	OS_DisableInterrupts();
-	while(semaPt->Value < 0)
+	while(semaPt->Value <= 0)
 	{
 		OS_EnableInterrupts();
 		OS_DisableInterrupts();
