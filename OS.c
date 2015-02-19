@@ -182,9 +182,7 @@ int OS_AddThread(void(*task)(void),
 // Inputs: none
 // Outputs: Thread ID, number greater than zero 
 unsigned long OS_Id(void){
-	long sr = StartCritical();
 	return RunPt->ID;
-	EndCritical(sr);
 }
 
 

@@ -404,12 +404,11 @@ void Thread1b(void){
     Count1++;
   }
 }
-int Thread2b(void){
+void Thread2b(void){
   Count2 = 0;          
   for(;;){
     PE1 ^= 0x02;       // heartbeat
     Count2++;
-		return 0;
   }
 }
 void Thread3b(void){
