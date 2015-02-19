@@ -85,6 +85,53 @@ SysTick_Handler
     CPSIE   I                  ; 9) tasks run with interrupts enabled
     BX      LR                 ; 10) restore R0-R3,R12,LR,PC,PSR
 
+; Spin-Lock counting Semaphore
+;OS_Wait ;R0 points to counter
+;	LDREX	R1,[R0] ; counter
+;	SUBS	R1, #1	; counter - 1
+;	ITT		PL		; ok if >= 0
+;	STREXPL	R2,R1,[R0]	; try update
+;	CMPPL	R2, #0	; succeed?
+;	BNE		OS_Wait	; no, try again
+;	BX		LR
+
+; Spin-Lock counting Semaphore
+;OS_Signal ; R0 points to counter
+;	LDREX	R1,	[R0]	; counter
+;	ADD 	R1,	#1		; counter + 1
+;	STREX	R2, R1, [R0]	; try update
+;	CMPPL	R2, #0		; succeed?
+;	BNE		OS_Signal	; no, try again
+;	BX		LR
+
+
+
+; DA 2/18/15 This was derived from Spin-Lock Semaphore
+; and might be incorrect, changed subtract to LDR R0,#0
+; Binary Semaphore
+;OS_bWait ;R0 points to counter
+;	LDREX	R1,[R0] ; flag
+;	LDR		R1, #0	; flag = 0
+;	ITT		PL		; ok if >= 0
+;	STREXPL	R2,R1,[R0]	; try update
+;	CMPPL	R2, #0	; succeed?
+;	BNE		OS_Wait	; no, try again
+;	BX		LR
+
+; DA 2/18/15 This was derived from the Spin-Lock Semaphore
+; and might be incorrect, I just changed Add R1,#1 to LDR R0,#1
+; Binary Semaphore
+;OS_bSignal ; R0 points to flag
+;	LDREX	R1,	[R0]	; flag
+;	LDR 	R1,	#1		; flag = 1
+;	STREX	R2, R1, [R0]	; try update
+;	CMPPL	R2, #0		; succeed?
+;	BNE		OS_Signal	; no, try again
+;	BX		LR
+
+
+
+
     ALIGN
     END
 		
