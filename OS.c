@@ -23,6 +23,7 @@ void StartOS(void);
 struct tcb{
 	int32_t *sp;
 	struct tcb *next;
+	struct tcb *previous;
 	int32_t ID;
 	int32_t SleepCtr;
 	int32_t Priority;
@@ -133,9 +134,11 @@ int OS_AddThread(void(*task)(void),
 	tcbs[i].SleepCtr=0;
 	if(i>0){
 		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
+		 tcbs[i].previous=&tcbs[i-1];
 		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
 	}else{
 		tcbs[0].next=&tcbs[0];
+		tcbs[0].previous=&tcbs[0];
 	}
   SetInitialStack(i); 
 	Stacks[i][stackSize-2] = (int32_t)(task); // PC
