@@ -83,7 +83,15 @@ void OS_InitSemaphore(Sema4Type *semaPt, long value){
 // input:  pointer to a counting semaphore
 // output: none
 void OS_Wait(Sema4Type *semaPt){
-;
+	
+	OS_DisableInterrupts();
+	while(semaPt->Value < 0)
+	{
+		OS_EnableInterrupts();
+		OS_DisableInterrupts();
+	}
+	semaPt->Value = semaPt->Value - 1;
+	OS_EnableInterrupts();
 }	
 
 // ******** OS_Signal ************
@@ -92,8 +100,12 @@ void OS_Wait(Sema4Type *semaPt){
 // Lab3 wakeup blocked thread if appropriate 
 // input:  pointer to a counting semaphore
 // output: none
-void OS_Signal(Sema4Type *semaPt){
-;
+void OS_Signal(Sema4Type *semaPt)
+{	
+	int32_t status;
+	status = StartCritical();
+	semaPt->Value = semaPt->Value + 1;
+	EndCritical(status);
 }	
 
 // ******** OS_bWait ************
@@ -102,7 +114,15 @@ void OS_Signal(Sema4Type *semaPt){
 // input:  pointer to a binary semaphore
 // output: none
 void OS_bWait(Sema4Type *semaPt){
-	;
+	
+	OS_DisableInterrupts();
+	while(semaPt->Value == 0)
+	{
+		OS_EnableInterrupts();
+		OS_DisableInterrupts();
+	}
+	semaPt->Value = 0;
+	OS_EnableInterrupts();
 }
 
 // ******** OS_bSignal ************
@@ -111,7 +131,12 @@ void OS_bWait(Sema4Type *semaPt){
 // input:  pointer to a binary semaphore
 // output: none
 void OS_bSignal(Sema4Type *semaPt){
-	;
+	
+	int32_t status;
+	
+	status = StartCritical();
+	semaPt->Value = 1;
+	EndCritical(status);
 }
 
 //******** OS_AddThread *************** 
