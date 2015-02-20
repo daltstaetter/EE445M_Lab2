@@ -364,7 +364,11 @@ int TIMER_TimerInit(void(*task)(void), int timer, unsigned long desiredFrequency
 // Read Timer Count in the timer																									
 unsigned long TIMER_ReadTimerValue(int timer)
 {
-	unsigned long count = 0;
+	int32_t status;
+	unsigned long count;
+	status = StartCritical(); // if it interrupts after it read thhe
+	// value from TIMERX_TAR_R and then interrupts before leaving
+	// it will return an incorrect Timer count value
 	switch(timer)
 	{
 		case 0: // TimerA0
@@ -418,6 +422,7 @@ unsigned long TIMER_ReadTimerValue(int timer)
 		default:
 			break;
 	}
+	EndCritical(status);
 	return count;
 }
 

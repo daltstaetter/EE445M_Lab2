@@ -64,15 +64,17 @@ unsigned long JitterHistogram[JITTERSIZE]={0,};
 #define PE2  (*((volatile unsigned long *)0x40024010))
 #define PE3  (*((volatile unsigned long *)0x40024020))
 
-void PortE_Init(void){ unsigned long volatile delay;
-  SYSCTL_RCGC2_R |= 0x10;       // activate port E
+void PortE_Init(void){ 
+	
+	unsigned long volatile delay;
+	SYSCTL_RCGCGPIO_R  |= SYSCTL_RCGC2_GPIOE;       // activate port E
   delay = SYSCTL_RCGC2_R;        
   delay = SYSCTL_RCGC2_R;         
   GPIO_PORTE_DIR_R |= 0x0F;    // make PE3-0 output heartbeats
   GPIO_PORTE_AFSEL_R &= ~0x0F;   // disable alt funct on PE3-0
   GPIO_PORTE_DEN_R |= 0x0F;     // enable digital I/O on PE3-0
   GPIO_PORTE_PCTL_R = ~0x0000FFFF;
-  GPIO_PORTE_AMSEL_R &= ~0x0F;;      // disable analog functionality on PF
+  GPIO_PORTE_AMSEL_R &= ~0x0F;;      // disable analog functionality on PE
 }
 //------------------Task 1--------------------------------
 // 2 kHz sampling ADC channel 1, using software start trigger
@@ -408,20 +410,11 @@ void Thread1b(void){
   }
 }
 void Thread2b(void){
-<<<<<<< HEAD
-  Count2 = 0;          
-=======
-  int i;
-	Count2 = 0;          
->>>>>>> cb7246e11f0ad35620f5329c75cca60a446847e5
   for(;;){
     //PE1 ^= 0x02;       // heartbeat
 		ST7735_Message (0, 1, "Thread ", 1);
     Count2++;
-<<<<<<< HEAD
-=======
 		//for (i=0;i<10000;i++){}
->>>>>>> cb7246e11f0ad35620f5329c75cca60a446847e5
   }
 }
 void Thread3b(void){
@@ -435,15 +428,11 @@ void Thread3b(void){
   }
 }
 int main(void){  // Testmain2
-<<<<<<< HEAD
-  OS_Init();           // initialize, disable interrupts
-	PortE_Init();       // profile user threads
-=======
 	OS_Init();           // initialize, disable interrupts
 	OS_InitSemaphore(&LCDmutex,1);
 	Output_Init();
   //PortE_Init();       // profile user threads
->>>>>>> cb7246e11f0ad35620f5329c75cca60a446847e5
+
   NumCreated = 0 ;
   NumCreated += OS_AddThread(&Thread1b,128,1); 
   NumCreated += OS_AddThread(&Thread2b,128,2); 

@@ -10,7 +10,6 @@
 #include "PLL.h"
 #include "TIMER.h"
 #include "ifdef.h"
-//#define SYSTICK // defined in ifdef.h
 
 // function definitions in osasm.s
 void OS_DisableInterrupts(void); // Disable interrupts
@@ -18,6 +17,9 @@ void OS_EnableInterrupts(void);  // Enable interrupts
 int32_t StartCritical(void);
 void EndCritical(int32_t primask);
 void StartOS(void);
+
+#define MAILBOX_EMPTY	0
+#define MAILBOX_FULL	1
 
 #define NUMTHREADS 3
 #define STACKSIZE 128
@@ -38,6 +40,12 @@ volatile int mutex;
 volatile int RoomLeft;
 volatile int CurrentSize;
 Sema4Type LCDmutex;
+unsigned long g_mailboxData;
+int32_t g_mailboxFlag;
+unsigned long* g_ulFifo; // pointer to OS_FIFO
+
+unsigned long g_getIndex; // get ptr for OS_FIFO
+unsigned long g_putIndex; // put ptr for OS_FIFO
 
 void SetInitialStack(int i){
   tcbs[i].sp = &Stacks[i][STACKSIZE-16]; // thread stack pointer
@@ -68,7 +76,8 @@ void OS_Init(void){
   PLL_Init();                 // set processor clock to 80 MHz
 	#ifdef SYSTICK
   NVIC_ST_CTRL_R = 0;         // disable SysTick during setup
-  NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R&0x00FFFFFF)|0xE0000000; // priority 7
+  NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R & ~NVIC_SYS_PRI3_TICK_M)|(0x7 << NVIC_SYS_PRI3_TICK_S); // priority 7
+	
 	#endif
 	NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R&(~NVIC_SYS_PRI3_PENDSV_M))|(0x7 << NVIC_SYS_PRI3_PENDSV_S); // PendSV priority 7
 	//NVIC_SYS_HND_CTRL_R |= NVIC_SYS_HND_CTRL_PNDSV; //enable PendSV
@@ -79,16 +88,13 @@ void OS_Init(void){
 // input:  pointer to a semaphore
 // output: none
 void OS_InitSemaphore(Sema4Type *semaPt, long value){
-<<<<<<< HEAD
 	int32_t status;
 	status = StartCritical();
 	semaPt->Value = value;
 	EndCritical(status);
-=======
-	semaPt->Value=value;
->>>>>>> cb7246e11f0ad35620f5329c75cca60a446847e5
 }
 
+// DA 2/18
 // ******** OS_Wait ************
 // decrement semaphore 
 // Lab2 spinlock
@@ -108,6 +114,7 @@ void OS_Wait(Sema4Type *semaPt){
 	OS_EnableInterrupts();
 }	
 
+// DA 2/18
 // ******** OS_Signal ************
 // increment semaphore 
 // Lab2 spinlock
@@ -123,6 +130,7 @@ void OS_Signal(Sema4Type *semaPt)
 	EndCritical(status);
 }	
 
+// DA 2/18
 // ******** OS_bWait ************
 // Lab2 spinlock, set to 0
 // Lab3 block if less than zero
@@ -140,6 +148,7 @@ void OS_bWait(Sema4Type *semaPt){
 	OS_EnableInterrupts();
 }
 
+// DA 2/18
 // ******** OS_bSignal ************
 // Lab2 spinlock, set to 1
 // Lab3 wakeup blocked thread if appropriate 
@@ -173,13 +182,13 @@ int OS_AddThread(void(*task)(void),
 	tcbs[i].SleepCtr=0;
 	if(i>0){
 		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
-		 tcbs[i].previous=&tcbs[i-1];
+		 tcbs[i].previous=&tcbs[i-1]; //Create a back link from the thread we just left
 		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
 	}else{
 		tcbs[0].next=&tcbs[0];
 		tcbs[0].previous=&tcbs[0];
 	}
-  SetInitialStack(i); 
+  SetInitialStack(i); // initializes certain registers to arbitrary values
 	Stacks[i][stackSize-2] = (int32_t)(task); // PC
 	i++;
   EndCritical(status);
@@ -195,7 +204,6 @@ unsigned long OS_Id(void){
 }
 
 
-extern void(*HandlerTaskArray[12])(void); // Holds the function pointers to the threads that will be launched
 
 // initializes a new thread with given period and priority
 int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, unsigned long priority)
@@ -251,23 +259,35 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 	;
 }
 
+// DA 2/20
 // ******** OS_Sleep ************
 // place this thread into a dormant state
-// input:  number of msec to sleep
+// input:  -number of msec to sleep
+//				 -thread ID
 // output: none
 // You are free to select the time resolution for this function
 // OS_Sleep(0) implements cooperative multitasking
 void OS_Sleep(unsigned long sleepTime){
-	
-	;
+	RunPt->SleepCtr = sleepTime; // atomic operation
 }
 
+// DA 2/20
 // ******** OS_Kill ************
 // kill the currently running thread, release its TCB and stack
 // input:  none
 // output: none
 void OS_Kill(void){
-	;
+	
+	int32_t status;
+	status = StartCritical();
+	RunPt->previous->next = RunPt->next; 
+	// remove tcb from linked list by 
+	// moving the previous nodes nextPtr
+	// to the current node's nextPtr
+	
+	RunPt->sp = NULL;
+	// release reference to stack pointer
+	EndCritical(status);
 }
 
 // ******** OS_Suspend ************
@@ -294,7 +314,14 @@ void OS_Suspend(void){
 // In Lab 3, you can put whatever restrictions you want on size
 //    e.g., 4 to 64 elements
 //    e.g., must be a power of 2,4,8,16,32,64,128
-void OS_Fifo_Init(unsigned long size){;}
+void OS_Fifo_Init(unsigned long size){
+
+	// does this need to be protected???
+	// will it only be called at the beginning
+	g_ulFifo = (unsigned long*) malloc(sizeof(unsigned long) * size);
+	g_putIndex = 0;
+	g_getIndex = 0;
+}
 
 // ******** OS_Fifo_Put ************
 // Enter one data sample into the Fifo
@@ -322,29 +349,51 @@ unsigned long OS_Fifo_Get(void){;}
 //          zero or less than zero if a call to OS_Fifo_Get will spin or block
 long OS_Fifo_Size(void){;}
 
+// DA 2/20
 // ******** OS_MailBox_Init ************
 // Initialize communication channel
+// Clear mailboxData and set flag to empty
 // Inputs:  none
 // Outputs: none
-void OS_MailBox_Init(void){;}
+void OS_MailBox_Init(void){
 
+	int32_t status;
+	status = StartCritical();
+	g_mailboxData = 0;
+	g_mailboxFlag = MAILBOX_EMPTY;
+	EndCritical(status);
+}
+
+// DA 2/20
 // ******** OS_MailBox_Send ************
 // enter mail into the MailBox
 // Inputs:  data to be sent
 // Outputs: none
 // This function will be called from a foreground thread
 // It will spin/block if the MailBox contains data not yet received 
-void OS_MailBox_Send(unsigned long data){;}
+void OS_MailBox_Send(unsigned long data){
+	// don't have to worry about critical sections when writing/reading
+	// data bc the Flag synchronizes/locks the shared resource
+	g_mailboxData = data;
+	g_mailboxFlag = MAILBOX_FULL;
+}
 
+// DA 2/20
 // ******** OS_MailBox_Recv ************
 // remove mail from the MailBox
 // Inputs:  none
 // Outputs: data received
 // This function will be called from a foreground thread
 // It will spin/block if the MailBox is empty 
-unsigned long OS_MailBox_Recv(void){;
+unsigned long OS_MailBox_Recv(void){
 
-
+	g_mailboxFlag = MAILBOX_EMPTY;
+	// I am worried about a critical section if it interrupts
+	// here and it signifies the mbox empty when it has data that
+	// hasn't been read and hasn't yet returned. It depends on how
+	// it is used which determines if it is critical or not since you can't 
+	// release the resource after you've returned
+	return g_mailboxData;
 }
 
 // ******** OS_Time ************
@@ -400,6 +449,13 @@ void OS_Launch(unsigned long theTimeSlice){
 
 
 // Resets the 32-bit counter to zero
+// DA 2/20	
+// SERIOUS POTENTIAL PROBLEM, IF WE
+// ARE LOOKING AT TIME DIFFERENCES AND
+// WE CLEAR THIS OUT BUT DON'T STOP
+// A TASK FROM LOOKING AT THE TIME DIFFERENCE
+// IT WILL USE AN INCORRECT TIME DIFF
+// SINCE WE FORCED IT INTO RESET
 void OS_ClearPeriodicTime(int timer)
 {
 	TIMER_ClearPeriodicTime(timer);
@@ -417,7 +473,7 @@ unsigned long OS_ReadTimerValue(int timer)
 }
 
 
-// launches all programs
+/* launches all programs
 //void OS_LaunchAll(void(**taskPtrPtr)(void))
 //{
 ////	int i;
@@ -438,6 +494,7 @@ unsigned long OS_ReadTimerValue(int timer)
 //		OS_LaunchThread(taskPtrPtr[i],usedTimers[i]);
 //	}
 //}
+*/
 
 // enables interrupts in the NVIC vector table
 void OS_NVIC_EnableTimerInt(int timer)
@@ -450,7 +507,6 @@ void OS_NVIC_DisableTimerInt(int timer)
 {
 	TIMER_NVIC_DisableTimerInt(timer);
 }
-
 
 void OS_LaunchThread(void(*taskPtr)(void), int timer)
 {

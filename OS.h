@@ -10,6 +10,10 @@
 #ifndef __OS_H
 #define __OS_H  1
 
+// Holds the function pointers to the threads that will be launched
+extern void(*HandlerTaskArray[12])(void); 
+#include <stdlib.h>
+
 // edit these depending on your clock        
 #define TIME_1MS    80000          
 #define TIME_2MS    (2*TIME_1MS)  

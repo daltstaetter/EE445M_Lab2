@@ -10,19 +10,16 @@
 #define TIMER5_CTL_PTR_R            (volatile uint32_t *)0x4003500C
 	
 #define CLOCKSPEED_80MHZ			80000000 // 80 MHz
-
-
-
-
-
-
-
-
-
+#define CLOCKSPEED_50MHZ			80000000 // 80 MHz
 
 
 extern void(*HandlerTaskArray[12])(void);
 extern volatile unsigned int* timerCtrlBuf[12];
+extern void OS_DisableInterrupts(void); // Disable interrupts
+extern void OS_EnableInterrupts(void);  // Enable interrupts
+extern int32_t StartCritical(void);
+extern void EndCritical(int32_t primask);
+
 
 
 
