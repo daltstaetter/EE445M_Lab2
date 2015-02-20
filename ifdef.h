@@ -4,5 +4,4 @@
 //#define FINAL
 //#define INTERPRETER
 #define DEBUG
-//#define SYSTICK
-
+#define SYSTICK

@@ -48,30 +48,34 @@ void NAME ## Fifo_Init(void){ long sr;  \
 }                                       \
 int NAME ## Fifo_Put (TYPE data){       \
 	OS_Wait(&RoomLeft);									\
-	OS_Wait(&mutex);										\
+	OS_bWait(&mutex);										\
   if(( NAME ## PutI - NAME ## GetI ) & ~(SIZE-1)){  \
+		OS_bSignal(&mutex);				\
+		OS_Signal(&CurrentSize);			\
     return(FAIL);      \
   }                    \
   NAME ## Fifo[ NAME ## PutI &(SIZE-1)] = data; \
   NAME ## PutI ## ++;  \
-	OS_Signal(&mutex);	\
+	OS_bSignal(&mutex);	\
 	OS_Signal(&CurrentSize);		\
   return(SUCCESS);     \
 }                      \
 int NAME ## Fifo_Get (TYPE *datapt){  \
 	OS_Wait(&CurrentSize);							\
-	OS_Wait(&mutex);										\
+	OS_bWait(&mutex);										\
   if( NAME ## PutI == NAME ## GetI ){ \
+		OS_bSignal(&mutex);				\
+		OS_Signal(&RoomLeft);			\
     return(FAIL);      \
   }                    \
   *datapt = NAME ## Fifo[ NAME ## GetI &(SIZE-1)];  \
   NAME ## GetI ## ++;  \
-	OS_Signal(&mutex);		\
+	OS_bSignal(&mutex);		\
 	OS_Signal(&RoomLeft);	\
   return(SUCCESS);     \
 }                      \
 unsigned short NAME ## Fifo_Size (void){  \
-	OS_Wait(&mutex);			\
+	OS_bWait(&mutex);			\
 	unsigned short temp = NAME ## PutI - NAME ## GetI;			\
 	OS_Signal(&mutex);								\
  return (temp);  \
@@ -93,47 +97,51 @@ void NAME ## Fifo_Init(void){ long sr;  \
 }                                       \
 int NAME ## Fifo_Put (TYPE data){       \
 	OS_Wait(&RoomLeft);									\
-	OS_Wait(&mutex);										\
+	OS_bWait(&mutex);										\
   TYPE volatile *nextPutPt;             \
   nextPutPt = NAME ## PutPt + 1;        \
   if(nextPutPt == &NAME ## Fifo[SIZE]){ \
     nextPutPt = &NAME ## Fifo[0];       \
   }                                     \
   if(nextPutPt == NAME ## GetPt ){      \
+		OS_bSignal(&mutex); \
+		OS_Signal(&CurrentSize);		\
     return(FAIL);                       \
   }                                     \
   else{                                 \
     *( NAME ## PutPt ) = data;          \
     NAME ## PutPt = nextPutPt;          \
-		OS_Signal(&mutex);	\
+		OS_bSignal(&mutex);	\
 		OS_Signal(&CurrentSize);		\
     return(SUCCESS);                    \
   }                                     \
 }                                       \
 int NAME ## Fifo_Get (TYPE *datapt){    \
 	OS_Wait(&CurrentSize);							\
-	OS_Wait(&mutex);										\
+	OS_bWait(&mutex);										\
   if( NAME ## PutPt == NAME ## GetPt ){ \
+		OS_bSignal(&mutex);				\
+		OS_Signal(&RoomLeft);			\
     return(FAIL);                       \
   }                                     \
   *datapt = *( NAME ## GetPt ## ++);    \
   if( NAME ## GetPt == &NAME ## Fifo[SIZE]){ \
     NAME ## GetPt = &NAME ## Fifo[0];   \
   }                                     \
-	OS_Signal(&mutex);		\
+	OS_bSignal(&mutex);		\
 	OS_Signal(&RoomLeft);	\
   return(SUCCESS);                      \
 }                                       \
 unsigned short NAME ## Fifo_Size (void){\
 	unsigned short temp;		\
-	OS_Wait(&mutex);\
+	OS_bWait(&mutex);\
   if( NAME ## PutPt < NAME ## GetPt ){  \
 		temp = NAME ## PutPt - NAME ## GetPt + (SIZE*sizeof(TYPE)))/sizeof(TYPE); \
-		OS_Signal(&mutex);			\
+		OS_bSignal(&mutex);			\
     return temp; \
   }                                     \
 	temp = NAME ## PutPt - NAME ## GetPt )/sizeof(TYPE);  \
-	OS_Signal(&mutex); \
+	OS_bSignal(&mutex); \
   return temp; \
 }
 // e.g.,
