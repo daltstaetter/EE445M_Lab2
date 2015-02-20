@@ -608,6 +608,3 @@ void Timer5B_Handler(void)
 	(*(HandlerTaskArray[11]))(); // start Timer5B task
 }
 
-
-
-																									

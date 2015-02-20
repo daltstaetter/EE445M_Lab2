@@ -1,6 +1,6 @@
 //Timer.h
 
-
+#include <stdint.h>
 // these are stored in a buffer to easily start tasks by enabling the timer
 #define TIMER0_CTL_PTR_R            (volatile uint32_t *)0x4003000C
 #define TIMER1_CTL_PTR_R            (volatile uint32_t *)0x4003100C
@@ -33,6 +33,7 @@ int TIMER_TimerInit(void(*task)(void), int timer, unsigned long desiredFrequency
 
 void TIMER_ClearPeriodicTime(int timer);
 
+unsigned long TIMER_ReadTimerPeriod(int timer);
 
 // Read Timer Count in the timer																									
 unsigned long TIMER_ReadTimerValue(int timer);

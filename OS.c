@@ -78,9 +78,11 @@ void OS_Init(void){
 // input:  pointer to a semaphore
 // output: none
 void OS_InitSemaphore(Sema4Type *semaPt, long value){
-	;
+	int32_t status;
+	status = StartCritical();
+	semaPt->Value = value;
+	EndCritical(status);
 }
-
 
 // ******** OS_Wait ************
 // decrement semaphore 
@@ -88,6 +90,7 @@ void OS_InitSemaphore(Sema4Type *semaPt, long value){
 // Lab3 block if less than zero
 // input:  pointer to a counting semaphore
 // output: none
+// From book pg. 191
 void OS_Wait(Sema4Type *semaPt){
 	
 	OS_DisableInterrupts();
@@ -106,6 +109,7 @@ void OS_Wait(Sema4Type *semaPt){
 // Lab3 wakeup blocked thread if appropriate 
 // input:  pointer to a counting semaphore
 // output: none
+// From book pg. 191
 void OS_Signal(Sema4Type *semaPt)
 {	
 	int32_t status;
@@ -251,6 +255,7 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 // You are free to select the time resolution for this function
 // OS_Sleep(0) implements cooperative multitasking
 void OS_Sleep(unsigned long sleepTime){
+	
 	;
 }
 
@@ -272,8 +277,8 @@ void OS_Kill(void){
 void OS_Suspend(void){
 	uint32_t sysreg;
 	long sr = StartCritical();
-	sysreg= NVIC_SYS_HND_CTRL_R;
-	NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
+	sysreg = NVIC_SYS_HND_CTRL_R;
+	NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV; // does a contex switch 
 	EndCritical(sr);
 }
  
@@ -334,7 +339,10 @@ void OS_MailBox_Send(unsigned long data){;}
 // Outputs: data received
 // This function will be called from a foreground thread
 // It will spin/block if the MailBox is empty 
-unsigned long OS_MailBox_Recv(void){;}
+unsigned long OS_MailBox_Recv(void){;
+
+
+}
 
 // ******** OS_Time ************
 // return the system time 
