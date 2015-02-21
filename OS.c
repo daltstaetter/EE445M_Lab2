@@ -16,6 +16,7 @@ void OS_DisableInterrupts(void); // Disable interrupts
 void OS_EnableInterrupts(void);  // Enable interrupts
 int32_t StartCritical(void);
 void EndCritical(int32_t primask);
+void PendSV_Handler(); // used for context switching in SysTick
 void StartOS(void);
 
 #define MAILBOX_EMPTY	0
@@ -35,6 +36,8 @@ typedef struct tcb tcbType;
 tcbType tcbs[NUMTHREADS];
 tcbType *RunPt;
 int32_t Stacks[NUMTHREADS][STACKSIZE];
+int32_t g_sleepingThreads[NUMTHREADS];
+int32_t g_numSleepingThreads = 0;
 
 volatile int mutex;
 volatile int RoomLeft;
@@ -263,12 +266,17 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 // ******** OS_Sleep ************
 // place this thread into a dormant state
 // input:  -number of msec to sleep
-//				 -thread ID
 // output: none
 // You are free to select the time resolution for this function
 // OS_Sleep(0) implements cooperative multitasking
 void OS_Sleep(unsigned long sleepTime){
+	int32_t status = StartCritical();
 	RunPt->SleepCtr = sleepTime; // atomic operation
+	g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
+	// store an array containing the ID's of sleeping threads
+	// this can be used to create a linked list of sleeping threads
+	
+	EndCritical(status);
 }
 
 // DA 2/20
@@ -469,7 +477,7 @@ unsigned long OS_ReadTimerPeriod(int timer)
 
 unsigned long OS_ReadTimerValue(int timer)
 {
-	return TIMER_ReadTimerValue(timer);
+	return TIMER_ReadTimerValue(timer); 
 }
 
 
@@ -582,3 +590,65 @@ void PF3_Toggle(void)
 
 void Jitter(void){;}
 
+__asm void
+	Delay(unsigned long ulCount)
+	{
+    subs    r0, #1
+    bne     Delay
+    bx      lr
+	}
+	
+	
+//__asm  
+void SysTick_Handler(void)
+{
+	// first decrement any sleeping threads
+	// assumed to interrupt on 2ms periodic intervals
+	int i;
+	int status;
+#define SYSTICK_PERIOD 2		
+	for(i = 0; i < g_numSleepingThreads; i++)
+	{
+		// I am not sure whether we should hardcode the timeDifference
+		// or use a function for it. the former is faster, the latter is 
+		// more stable. If we change SysTick frequency we need to remember 
+		// to change the hardcoded value too. or we could just use a variable 
+		// and set it where we initialize systick. I will hardcode a macro for now
+		tcbs[g_sleepingThreads[i]].SleepCtr -= SYSTICK_PERIOD;
+		
+		// come out of sleep state to the active thread state and put 
+		// it back in round robin for the scheduler, where should it go???
+		// Is there a preferrable way to do this? Run it first???
+		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
+		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
+		// should we run the lowest sleepCtr value first???
+		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
+		{
+			// Add to scheduler
+			// we also need to make sure there isn't an interrupt driven
+			// periodic thread that is trying to access this value, need a mutex
+			// problem is we would need one for each variable in each tcb not just 
+			// one mutex for all of them, bc others could change if they aren't accessing
+			// this particular sleepCtr. Or should we just StartCritical-EndCritical???
+			//OS_bWait(&semaphoreSleep0) // need more, not sure how to do this
+			// tcbs[g_sleepingThreads[i]].SleepCtr = 0;
+			//OS_bSignal(&semaphoreSleep0);
+			
+			// status = StartCritical();
+			tcbs[g_sleepingThreads[i]].next = RunPt->next; // insert thread between current thread and next thread
+			tcbs[g_sleepingThreads[i]].previous = RunPt; // give the added thread a next and previous tcb
+			
+			// update other tcbs in the Linked list
+			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
+			RunPt->next = &tcbs[g_sleepingThreads[i]];
+			// EndCritical(status);
+		}			
+		
+		
+	}
+	
+	// next do the context switch - currently round robin
+	PendSV_Handler();
+}
+	
+	
