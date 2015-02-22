@@ -619,6 +619,13 @@ void SysTick_Handler(void)
 		// come out of sleep state to the active thread state and put 
 		// it back in round robin for the scheduler, where should it go???
 		// Is there a preferrable way to do this? Run it first???
+		//KL 2/21
+		//We can leave sleeping threads in the linked list if we want and just execute
+		//this everytime a Systick is called. This isn't the most efficient but I remember it was mentioned in class
+		//for(0:number of threads){
+		//	if(sleep_counter>=0)
+		//    decrement sleep_counter
+		// }
 		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
 		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
 		// should we run the lowest sleepCtr value first???
