@@ -405,13 +405,17 @@ unsigned long OS_MailBox_Recv(void){
 }
 
 // ******** OS_Time ************
-// return the system time 
+// return the system time using SysTick
 // Inputs:  none
-// Outputs: time in 12.5ns units, 0 to 4294967295
+// Outputs: time in 12.5ns units, 0 to 2^24-1
 // The time resolution should be less than or equal to 1us, and the precision 32 bits
 // It is ok to change the resolution and precision of this function as long as 
 //   this function and OS_TimeDifference have the same resolution and precision 
-unsigned long OS_Time(void){;}
+unsigned long OS_Time(void)
+{
+	// assumes an 80 MHz Clock
+	return NVIC_ST_CURRENT_R;
+}
 
 // ******** OS_TimeDifference ************
 // Calculates difference between two times
@@ -420,7 +424,13 @@ unsigned long OS_Time(void){;}
 // The time resolution should be less than or equal to 1us, and the precision at least 12 bits
 // It is ok to change the resolution and precision of this function as long as 
 //   this function and OS_Time have the same resolution and precision 
-unsigned long OS_TimeDifference(unsigned long start, unsigned long stop){;}
+unsigned long OS_TimeDifference(unsigned long start, unsigned long stop)
+{
+	unsigned long diff;
+	
+	diff = start - stop;
+	
+}
 
 // ******** OS_ClearMsTime ************
 // sets the system time to zero (from Lab 1)
@@ -480,30 +490,6 @@ unsigned long OS_ReadTimerValue(int timer)
 	return TIMER_ReadTimerValue(timer); 
 }
 
-
-/* launches all programs
-//void OS_LaunchAll(void(**taskPtrPtr)(void))
-//{
-////	int i;
-////	int timerN;
-////	unsigned int TAEN_TBEN;
-////	for(i = 0; i <= timerCount; i++)
-////	{
-////		timerN = usedTimers[i]; // its the timerID 0 to 11
-////		TAEN_TBEN = ((timerN%2) ? TIMER_CTL_TBEN:TIMER_CTL_TAEN); // if timerN even => TAEN, timerN odd => TBEN
-////		*(timerCtrlBuf[timerN]) |= TAEN_TBEN;
-////	}
-//	
-//	// this assumes that the timers initialized in the same sequence as the tasks
-//	// i.e. usedTimer[i] was initialized for the functionPtr *(taskPtrPtr[i]) 
-//	int i;
-//	for(i = 0; i <= timerCount; i++)
-//	{
-//		OS_LaunchThread(taskPtrPtr[i],usedTimers[i]);
-//	}
-//}
-*/
-
 // enables interrupts in the NVIC vector table
 void OS_NVIC_EnableTimerInt(int timer)
 {
@@ -543,14 +529,11 @@ void OS_StopThread(void(*taskPtr)(void), int timer)
 }
 
 // this configures the timers for 32-bit mode, periodic mode
-//
 int OS_TimerInit(void(*task)(void), int timer, unsigned long desiredFrequency, unsigned long priority)
 {
 	TIMER_TimerInit(task,timer,desiredFrequency,priority);
 	return 0;
 }
-
-
 
 
 //Debugging Port F
@@ -590,15 +573,6 @@ void PF3_Toggle(void)
 
 void Jitter(void){;}
 
-__asm void
-	Delay(unsigned long ulCount)
-	{
-    subs    r0, #1
-    bne     Delay
-    bx      lr
-	}
-	
-	
 //__asm  
 void SysTick_Handler(void)
 {
@@ -655,7 +629,8 @@ void SysTick_Handler(void)
 	}
 	
 	// next do the context switch - currently round robin
-	PendSV_Handler();
+	//PendSV_Handler();
+	OS_Suspend();
 }
 	
 	

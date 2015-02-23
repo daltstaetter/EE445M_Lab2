@@ -404,7 +404,7 @@ void Thread1b(void){
   Count1 = 0;          
   for(;;){
     //PE0 ^= 0x01;       // heartbeat
-		ST7735_Message (0, 0, "Thread ", 0);
+//		ST7735_Message (0, 0, "Thread ", 0);
     Count1++;
 		//for (i=0;i<10000;i++){}
   }
@@ -412,7 +412,7 @@ void Thread1b(void){
 void Thread2b(void){
   for(;;){
     //PE1 ^= 0x02;       // heartbeat
-		ST7735_Message (0, 1, "Thread ", 1);
+//		ST7735_Message (0, 1, "Thread ", 1);
     Count2++;
 		//for (i=0;i<10000;i++){}
   }
@@ -422,12 +422,13 @@ void Thread3b(void){
   Count3 = 0;          
   for(;;){
     //PE2 ^= 0x04;       // heartbeat
-		ST7735_Message (0, 2, "Thread ", 2);
+//		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
 		//for (i=0;i<10000;i++){}
   }
 }
 int main(void){  // Testmain2
+
 	OS_Init();           // initialize, disable interrupts
 	OS_InitSemaphore(&LCDmutex,1);
 	Output_Init();
