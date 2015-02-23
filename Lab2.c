@@ -410,6 +410,9 @@ void Thread1b(void){
   }
 }
 void Thread2b(void){
+	
+	int i;
+	i = 0;
   for(;;){
     PE1 ^= 0x02;       // heartbeat
 //		ST7735_Message (0, 1, "Thread ", 1);
@@ -424,10 +427,24 @@ void Thread3b(void){
     PE2 ^= 0x04;       // heartbeat
 //		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
-		OS_Sleep(5);
+	//	OS_Sleep(1000000);
 		//for (i=0;i<10000;i++){}
   }
 }
+
+void Thread4b(void){
+	int i;
+  Count4 = 0;          
+  for(;;){
+    //PE2 ^= 0x04;       // heartbeat
+//		ST7735_Message (0, 2, "Thread ", 2);
+    Count4++;
+		OS_Sleep(1);
+		//for (i=0;i<10000;i++){}
+  }
+}
+
+
 int main(void){  // Testmain2
 
 	OS_Init();           // initialize, disable interrupts
@@ -438,7 +455,8 @@ int main(void){  // Testmain2
   NumCreated = 0 ;
   NumCreated += OS_AddThread(&Thread1b,128,1); 
   NumCreated += OS_AddThread(&Thread2b,128,2); 
-  NumCreated += OS_AddThread(&Thread3b,128,3); 
+  NumCreated += OS_AddThread(&Thread3b,128,3);
+	NumCreated += OS_AddThread(&Thread4b,128,4);	
   // Count1 Count2 Count3 should be equal on average
   // counts are larger than testmain1
  
@@ -486,7 +504,7 @@ void Thread3c(void){
     Count3++;
   }
 }
-void Thread4c(void){ int i;	
+void Thread4c(void){ int i;
   for(i=0;i<64;i++){
     Count4++;
     OS_Sleep(10);
@@ -497,16 +515,13 @@ void Thread4c(void){ int i;
 void BackgroundThread5c(void){   // called when Select button pushed
   NumCreated += OS_AddThread(&Thread4c,128,3); 
 }
-void DoNothing(void){
-	;
-}
       
 int Testmain3(void){   // Testmain3
   Count4 = 0;          
   OS_Init();           // initialize, disable interrupts
 // Count2 + Count5 should equal Count1
   NumCreated = 0 ;
-  OS_AddSwitchTasks(&BackgroundThread5c,&DoNothing,2); //adds background thread5c to be executed every time PF4 is pressed
+  OS_AddSW1Task(&BackgroundThread5c,2);
   NumCreated += OS_AddThread(&Thread2c,128,2); 
   NumCreated += OS_AddThread(&Thread3c,128,3); 
   NumCreated += OS_AddThread(&Thread4c,128,3); 
@@ -567,7 +582,7 @@ int Testmain4(void){   // Testmain4
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
   OS_AddPeriodicThread(&BackgroundThread1d,1,PERIOD,0); 
-  OS_AddSwitchTasks(&BackgroundThread5d,&DoNothing,2);
+  OS_AddSW1Task(&BackgroundThread5d,2);
   NumCreated += OS_AddThread(&Thread2d,128,2); 
   NumCreated += OS_AddThread(&Thread3d,128,3); 
   NumCreated += OS_AddThread(&Thread4d,128,3); 
