@@ -228,11 +228,9 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 	return 0;
 }
 
-//KL 2/22/2015
 //******** OS_AddSW1Task *************** 
-// add a background tasks to run whenever the SW1 (PF4) button is pushed or the SW2 (PF0) button is pusehd
-// Inputs: pointer to a void/void background function for PF4
-//				 pointer to a void/void background function for PF0
+// add a background task to run whenever the SW1 (PF4) button is pushed
+// Inputs: pointer to a void/void background function
 //         priority 0 is the highest, 5 is the lowest
 // Outputs: 1 if successful, 0 if this thread can not be added
 // It is assumed that the user task will run to completion and return
@@ -243,81 +241,10 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 // In lab 2, the priority field can be ignored
 // In lab 3, there will be up to four background threads, and this priority field 
 //           determines the relative priority of these four threads
-
-#define PF4       (*((volatile uint32_t *)0x40025040))
-#define PF0       (*((volatile uint32_t *)0x40025004))
-void (*PF4Task)(void);  //user function on rising edge of PF4
-void (*PF0Task)(void);  //user function on rising edge of PF1
-uint32_t static g_LastPF4; //previous value
-uint32_t static g_LastPF0; //previous value
-int OS_AddSwitchTasks(void(*task1)(void), void(*task2) (void),unsigned long priority){
-	uint32_t delay;
-	SYSCTL_RCGCGPIO_R |= 0x00000020;  // activate clock for Port F
-	PF4Task = task1;
-	PF0Task = task2;
-  delay = SYSCTL_RCGCGPIO_R;        // allow time for clock to start
-  GPIO_PORTF_LOCK_R = 0x4C4F434B;   // unlock GPIO Port F
-  GPIO_PORTF_CR_R |= 0x11;           // allow changes to PF4
-  // only PF0 needs to be unlocked, other bits can't be locked
-  GPIO_PORTF_AMSEL_R &= ~0x11;        // disable analog on PF4, PF0
-  GPIO_PORTF_PCTL_R |= 0x11;   // PCTL GPIO on PF4, PF0
-  GPIO_PORTF_DIR_R &= ~0x11;          //PF4, PF0 in
-  GPIO_PORTF_AFSEL_R &= ~0x11;        // disable alt funct on PF4, PF0
-  GPIO_PORTF_PUR_R |= 0x11;          // enable pull-up on PF4, PF0
-  GPIO_PORTF_DEN_R |= 0x11;          // enable digital I/O on PF4, PF0
-	GPIO_PORTF_IS_R &= ~0x11;						// PF4, PF0 is edge-sensistive
-	GPIO_PORTF_IBE_R |= 0x11;					//PF4, PF0 is both edges
-	GPIO_PORTF_ICR_R = 0x11;				//clear flag4,flag0
-	GPIO_PORTF_IM_R |= 0x11;          // Enable interrupt on PF4, PF0
-	g_LastPF4 = PF4;
-	g_LastPF0 = PF0;
-	NVIC_PRI7_R = (NVIC_PRI7_R&(~NVIC_PRI7_INT30_M))|(priority<<NVIC_PRI7_INT30_S);
-	NVIC_EN0_R |= NVIC_EN0_INT30;
-	return 1;
-}
-
-void Switch1Task(){
+int OS_AddSW1Task(void(*task)(void), unsigned long priority){
 	;
 }
 
-void Switch2Task(){
-	;
-}
-
-
-
-void static DebounceTask(void){
-	//OS_Sleep(2); //foreground sleeping, must run within 50 ms
-	uint32_t pin;
-	pin = GPIO_PORTF_RIS_R |= 0x11;			//which switch triggered the interrupt
-	if(pin==0x10){			//switch 4 triggered the interrupt
-		g_LastPF4 = PF4;
-		GPIO_PORTF_ICR_R = 0x10;
-		GPIO_PORTF_IM_R |= 0x10;
-	}else if(pin==0x01){			//switch 0 triggered the interrupt
-		g_LastPF0 = PF0;
-		GPIO_PORTF_ICR_R = 0x01;
-		GPIO_PORTF_IM_R |= 0x01;
-	}	
-	//OS_Kill();
-}
-
-void GPIO_PortF_Handler(void){
-	uint32_t pin;
-	pin = GPIO_PORTF_RIS_R |= 0x11;			//which switch triggered the interrupt
-	if(pin==0x10){			//switch 4 triggered the interrupt
-		if(g_LastPF4 == 0){
-			(*PF4Task)();
-		}
-	}else if(pin==0x01){			//switch 0 triggered the interrupt
-		if(g_LastPF0 == 0){
-			(*PF0Task)();
-		}
-	}	
-	GPIO_PORTF_IM_R &= ~pin;			//disable interrupt on switch that triggered the previous interrupt
-	//OS_AddThread(&DebounceTask, 128, 0);
-}
-//Ignore for now
 //******** OS_AddSW2Task *************** 
 // add a background task to run whenever the SW2 (PF0) button is pushed
 // Inputs: pointer to a void/void background function
@@ -490,27 +417,40 @@ unsigned long OS_Time(void)
 	return NVIC_ST_CURRENT_R;
 }
 
+// DA 2/22
 // ******** OS_TimeDifference ************
 // Calculates difference between two times
 // Inputs:  two times measured with OS_Time
 // Outputs: time difference in 12.5ns units 
 // The time resolution should be less than or equal to 1us, and the precision at least 12 bits
 // It is ok to change the resolution and precision of this function as long as 
-//   this function and OS_Time have the same resolution and precision 
+// this function and OS_Time have the same resolution and precision 
 unsigned long OS_TimeDifference(unsigned long start, unsigned long stop)
 {
+	// NOTE: This cannot accurately account for time differences
+	// when you roll over. Requires: start > end & that both have been
+	// read within the same SysTick Period
 	unsigned long diff;
-	
 	diff = start - stop;
-	
+	return diff;
 }
 
+// DA 2/22
 // ******** OS_ClearMsTime ************
 // sets the system time to zero (from Lab 1)
+// Essentially disables SysTick
 // Inputs:  none
 // Outputs: none
 // You are free to change how this works
-void OS_ClearMsTime(void){;}
+void OS_ClearMsTime(void)
+{
+	int32_t status = StartCritical();
+	// Need to do this for SysTick since that
+	// is what we are using for the system time
+	NVIC_ST_RELOAD_R = 0;
+	NVIC_ST_CURRENT_R = 0;
+	EndCritical(status);
+}
 
 // ******** OS_MsTime ************
 // reads the current time in msec (from Lab 1)
@@ -518,7 +458,10 @@ void OS_ClearMsTime(void){;}
 // Outputs: time in ms units
 // You are free to select the time resolution for this function
 // It is ok to make the resolution to match the first call to OS_AddPeriodicThread
-unsigned long OS_MsTime(void){;}
+unsigned long OS_MsTime(void)
+{
+	
+}
 
 //******** OS_Launch *************** 
 // start the scheduler, enable interrupts
@@ -666,8 +609,14 @@ void SysTick_Handler(void)
 		// come out of sleep state to the active thread state and put 
 		// it back in round robin for the scheduler, where should it go???
 		// Is there a preferrable way to do this? Run it first???
-		//
-		// or scheduled based on the value of sleepCtr. e.g. if period is 5 ms
+		//KL 2/21
+		//We can leave sleeping threads in the linked list if we want and just execute
+		//this everytime a Systick is called. This isn't the most efficient but I remember it was mentioned in class
+		//for(0:number of threads){
+		//	if(sleep_counter>=0)
+		//    decrement sleep_counter
+		// }
+		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
 		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
 		// should we run the lowest sleepCtr value first???
 		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
@@ -690,13 +639,10 @@ void SysTick_Handler(void)
 			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
 			RunPt->next = &tcbs[g_sleepingThreads[i]];
 			// EndCritical(status);
-		}			
-		
-		
+		}				
 	}
 	
 	// next do the context switch - currently round robin
-	//PendSV_Handler();
 	OS_Suspend();
 }
 	
