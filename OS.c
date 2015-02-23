@@ -188,9 +188,9 @@ int OS_AddThread(void(*task)(void),
 		 tcbs[i].previous=&tcbs[i-1]; //Create a back link from the thread we just left
 		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
 	}else{
-		tcbs[0].next=&tcbs[0];
-		tcbs[0].previous=&tcbs[0];
+		tcbs[0].next = &tcbs[i];
 	}
+	tcbs[0].previous = &tcbs[i];
   SetInitialStack(i); // initializes certain registers to arbitrary values
 	Stacks[i][stackSize-2] = (int32_t)(task); // PC
 	i++;
@@ -656,7 +656,9 @@ void SysTick_Handler(void)
 	// assumed to interrupt on 2ms periodic intervals
 	int i;
 	int status;
+	int awakenedThreads;
 	status = StartCritical();
+	awakenedThreads=0;
 #define SYSTICK_PERIOD 2		
 	for(i = 0; i < g_numSleepingThreads; i++)
 	{
@@ -692,10 +694,12 @@ void SysTick_Handler(void)
 			// update other tcbs in the Linked list
 			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
 			RunPt->next = &tcbs[g_sleepingThreads[i]];
+			awakenedThreads++;
+			//tcbs[g_sleepingThreads[i]].next->previous->next = &tcbs[g_sleepingThreads[i]]; // insert thread between current thread and next thread
+			//tcbs[g_sleepingThreads[i]].previous->next->previous = &tcbs[g_sleepingThreads[i]]; // give the added thread a next and previous tcb
 		}			
-		
-		
 	}
+	g_numSleepingThreads -=awakenedThreads;
 	
 	// next do the context switch - currently round robin
 	//PendSV_Handler();
