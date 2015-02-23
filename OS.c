@@ -341,15 +341,17 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 // input:  -number of msec to sleep
 // output: none
 // You are free to select the time resolution for this function
-// OS_Sleep(0) implements cooperative multitasking
+// OS_Sleep(0) implements cooperative multitasking;
 void OS_Sleep(unsigned long sleepTime){
 	int32_t status = StartCritical();
 	RunPt->SleepCtr = sleepTime; // atomic operation
 	g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
 	// store an array containing the ID's of sleeping threads
 	// this can be used to create a linked list of sleeping threads
-	
+	RunPt->previous->next = RunPt->next; //Link the prior thread to the next thread
+	RunPt->next->previous = RunPt->previous;
 	EndCritical(status);
+	OS_Suspend();
 }
 
 // DA 2/20
@@ -362,6 +364,7 @@ void OS_Kill(void){
 	int32_t status;
 	status = StartCritical();
 	RunPt->previous->next = RunPt->next; 
+	RunPt->next->previous = RunPt->previous;
 	// remove tcb from linked list by 
 	// moving the previous nodes nextPtr
 	// to the current node's nextPtr
@@ -653,6 +656,7 @@ void SysTick_Handler(void)
 	// assumed to interrupt on 2ms periodic intervals
 	int i;
 	int status;
+	status = StartCritical();
 #define SYSTICK_PERIOD 2		
 	for(i = 0; i < g_numSleepingThreads; i++)
 	{
@@ -681,15 +685,13 @@ void SysTick_Handler(void)
 			//OS_bWait(&semaphoreSleep0) // need more, not sure how to do this
 			// tcbs[g_sleepingThreads[i]].SleepCtr = 0;
 			//OS_bSignal(&semaphoreSleep0);
-			
-			// status = StartCritical();
+		
 			tcbs[g_sleepingThreads[i]].next = RunPt->next; // insert thread between current thread and next thread
 			tcbs[g_sleepingThreads[i]].previous = RunPt; // give the added thread a next and previous tcb
 			
 			// update other tcbs in the Linked list
 			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
 			RunPt->next = &tcbs[g_sleepingThreads[i]];
-			// EndCritical(status);
 		}			
 		
 		
@@ -697,6 +699,7 @@ void SysTick_Handler(void)
 	
 	// next do the context switch - currently round robin
 	//PendSV_Handler();
+	EndCritical(status);
 	OS_Suspend();
 }
 	
