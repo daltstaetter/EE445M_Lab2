@@ -137,7 +137,12 @@ int OS_AddSW1Task(void(*task)(void), unsigned long priority);
 // In lab 3, this command will be called will be called 0 or 1 times
 // In lab 3, there will be up to four background threads, and this priority field 
 //           determines the relative priority of these four threads
-int OS_AddSW2Task(void(*task)(void), unsigned long priority);
+int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void), unsigned long priority);
+
+//User defined tasks for switch 1 and switch 2
+void Switch1Task(void);
+
+void Switch2Task(void);
 
 // ******** OS_Sleep ************
 // place this thread into a dormant state
