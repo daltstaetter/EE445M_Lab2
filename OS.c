@@ -191,6 +191,11 @@ int OS_AddThread(void(*task)(void),
 		tcbs[0].next=&tcbs[0];
 		tcbs[0].previous=&tcbs[0];
 	}
+	
+	tcbs[0].previous = &tcbs[i];
+	
+	
+	
   SetInitialStack(i); // initializes certain registers to arbitrary values
 	Stacks[i][stackSize-2] = (int32_t)(task); // PC
 	i++;
@@ -598,8 +603,11 @@ void SysTick_Handler(void)
 	// first decrement any sleeping threads
 	// assumed to interrupt on 2ms periodic intervals
 	int i;
+	int threadsAwakened;
 	int status;
 	status = StartCritical();
+	
+	threadsAwakened = 0;
 #define SYSTICK_PERIOD 2		
 	for(i = 0; i < g_numSleepingThreads; i++)
 	{
@@ -625,6 +633,7 @@ void SysTick_Handler(void)
 		// should we run the lowest sleepCtr value first???
 		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
 		{
+			threadsAwakened++;
 			// Add to scheduler
 			// we also need to make sure there isn't an interrupt driven
 			// periodic thread that is trying to access this value, need a mutex
@@ -643,6 +652,7 @@ void SysTick_Handler(void)
 			RunPt->next = &tcbs[g_sleepingThreads[i]];
 		}			
 	}
+	g_numSleepingThreads -= threadsAwakened; // update number of sleeping threads
 	
 	// next do the context switch - currently round robin
 	//PendSV_Handler();

@@ -427,10 +427,24 @@ void Thread3b(void){
     PE2 ^= 0x04;       // heartbeat
 //		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
-		OS_Sleep(5);
+	//	OS_Sleep(1000000);
 		//for (i=0;i<10000;i++){}
   }
 }
+
+void Thread4b(void){
+	int i;
+  Count4 = 0;          
+  for(;;){
+    //PE2 ^= 0x04;       // heartbeat
+//		ST7735_Message (0, 2, "Thread ", 2);
+    Count4++;
+		OS_Sleep(1);
+		//for (i=0;i<10000;i++){}
+  }
+}
+
+
 int main(void){  // Testmain2
 
 	OS_Init();           // initialize, disable interrupts
@@ -441,7 +455,8 @@ int main(void){  // Testmain2
   NumCreated = 0 ;
   NumCreated += OS_AddThread(&Thread1b,128,1); 
   NumCreated += OS_AddThread(&Thread2b,128,2); 
-  NumCreated += OS_AddThread(&Thread3b,128,3); 
+  NumCreated += OS_AddThread(&Thread3b,128,3);
+	NumCreated += OS_AddThread(&Thread4b,128,4);	
   // Count1 Count2 Count3 should be equal on average
   // counts are larger than testmain1
  
