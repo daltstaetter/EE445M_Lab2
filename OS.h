@@ -109,7 +109,7 @@ unsigned long OS_Id(void);
 int OS_AddPeriodicThread(void(*task)(void), int timer, 
    unsigned long period, unsigned long priority);
 
-//******** OS_AddSW1Task *************** 
+//******** OS_AddSwitchTasks *************** 
 // add a background task to run whenever the SW1 (PF4) button is pushed
 // Inputs: pointer to a void/void background function
 //         priority 0 is the highest, 5 is the lowest
@@ -122,7 +122,7 @@ int OS_AddPeriodicThread(void(*task)(void), int timer,
 // In lab 2, the priority field can be ignored
 // In lab 3, there will be up to four background threads, and this priority field 
 //           determines the relative priority of these four threads
-int OS_AddSW1Task(void(*task)(void), unsigned long priority);
+int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long priority);
 
 //******** OS_AddSW2Task *************** 
 // add a background task to run whenever the SW2 (PF0) button is pushed
