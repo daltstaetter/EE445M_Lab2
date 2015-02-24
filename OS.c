@@ -228,7 +228,7 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 	return 0;
 }
 
-//******** OS_AddSWwitchTasks *************** 
+//******** OS_AddSwitchTasks *************** 
 // add a background task to run whenever the SW1 (PF4) button is pushed
 // Inputs: pointer to a void/void background function
 //         priority 0 is the highest, 5 is the lowest
@@ -267,6 +267,7 @@ int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long prior
 	GPIO_PORTF_IM_R |= 0x11; 					//Arm interrupts
 	NVIC_PRI7_R = (NVIC_PRI7_R&NVIC_PRI7_INT30_M)|(priority<<NVIC_PRI7_INT30_S);
 	NVIC_EN0_R = NVIC_EN0_INT30;
+	return 1;
 }
 
 void static DebounceTask(void){
@@ -330,15 +331,20 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 // You are free to select the time resolution for this function
 // OS_Sleep(0) implements cooperative multitasking;
 void OS_Sleep(unsigned long sleepTime){
-	int32_t status = StartCritical();
-	RunPt->SleepCtr = sleepTime; // atomic operation
-	//g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
-	// store an array containing the ID's of sleeping threads
-	// this can be used to create a linked list of sleeping threads
-	//RunPt->previous->next = RunPt->next; //Link the prior thread to the next thread
-	//RunPt->next->previous = RunPt->previous;
-	EndCritical(status);
-	OS_Suspend();
+	int32_t status;
+
+	if(sleepTime > 0)
+	{
+		status = StartCritical();
+		RunPt->SleepCtr = sleepTime; // atomic operation
+		//g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
+		// store an array containing the ID's of sleeping threads
+		// this can be used to create a linked list of sleeping threads
+		//RunPt->previous->next = RunPt->next; //Link the prior thread to the next thread
+		//RunPt->next->previous = RunPt->previous;
+		EndCritical(status);
+		OS_Suspend();
+	}
 }
 
 // DA 2/20
@@ -349,16 +355,20 @@ void OS_Sleep(unsigned long sleepTime){
 void OS_Kill(void){
 	
 	int32_t status;
-	status = StartCritical();
-	RunPt->previous->next = RunPt->next; 
-	RunPt->next->previous = RunPt->previous;
-	// remove tcb from linked list by 
-	// moving the previous nodes nextPtr
-	// to the current node's nextPtr
-	
-	RunPt->sp = NULL;
-	// release reference to stack pointer
-	EndCritical(status);
+	if(RunPt->next != RunPt) // keep one thread running at all times
+	{		
+		status = StartCritical();
+		RunPt->previous->next = RunPt->next; 
+		RunPt->next->previous = RunPt->previous;
+		// remove tcb from linked list by 
+		// moving the previous nodes nextPtr
+		// to the current node's nextPtr
+		
+		RunPt->sp = NULL;
+		// release reference to stack pointer
+		EndCritical(status);
+		OS_Suspend();
+	}
 }
 
 // ******** OS_Suspend ************
@@ -660,59 +670,81 @@ void SysTick_Handler(void)
 	int i;
 	int threadsAwakened;
 	int status;
-	int awakenedThreads;
+	tcbType* sleepIterator;
 	status = StartCritical();
 	
 	threadsAwakened = 0;
-
-#define SYSTICK_PERIOD 2		
-	for(i = 0; i < g_numSleepingThreads; i++)
+#define SYSTICK_PERIOD 1	
+	
+	if(RunPt->SleepCtr > 0)
 	{
-		// I am not sure whether we should hardcode the timeDifference
-		// or use a function for it. the former is faster, the latter is 
-		// more stable. If we change SysTick frequency we need to remember 
-		// to change the hardcoded value too. or we could just use a variable 
-		// and set it where we initialize systick. I will hardcode a macro for now
-		tcbs[g_sleepingThreads[i]].SleepCtr -= SYSTICK_PERIOD;
+		RunPt->SleepCtr--;
+	}
+	for(sleepIterator = RunPt->next; sleepIterator != RunPt; sleepIterator = sleepIterator->next)
+	{
 		
-		// come out of sleep state to the active thread state and put 
-		// it back in round robin for the scheduler, where should it go???
-		// Is there a preferrable way to do this? Run it first???
-		//KL 2/21
-		//We can leave sleeping threads in the linked list if we want and just execute
-		//this everytime a Systick is called. This isn't the most efficient but I remember it was mentioned in class
-		//for(0:number of threads){
-		//	if(sleep_counter>=0)
-		//    decrement sleep_counter
-		// }
-		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
-		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
-		// should we run the lowest sleepCtr value first???
-		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
+		if(sleepIterator->SleepCtr > 0)
 		{
-			threadsAwakened++;
-			// Add to scheduler
-			// we also need to make sure there isn't an interrupt driven
-			// periodic thread that is trying to access this value, need a mutex
-			// problem is we would need one for each variable in each tcb not just 
-			// one mutex for all of them, bc others could change if they aren't accessing
-			// this particular sleepCtr. Or should we just StartCritical-EndCritical???
-			//OS_bWait(&semaphoreSleep0) // need more, not sure how to do this
-			// tcbs[g_sleepingThreads[i]].SleepCtr = 0;
-			//OS_bSignal(&semaphoreSleep0);
-		
-			tcbs[g_sleepingThreads[i]].next = RunPt->next; // insert thread between current thread and next thread
-			tcbs[g_sleepingThreads[i]].previous = RunPt; // give the added thread a next and previous tcb
-			
-			// update other tcbs in the Linked list
-			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
-			RunPt->next = &tcbs[g_sleepingThreads[i]];
-			awakenedThreads++;
-		}			
+
+			sleepIterator->SleepCtr -= SYSTICK_PERIOD;
+		}
+//		
+//		
+//		// I am not sure whether we should hardcode the timeDifference
+//		// or use a function for it. the former is faster, the latter is 
+//		// more stable. If we change SysTick frequency we need to remember 
+//		// to change the hardcoded value too. or we could just use a variable 
+//		// and set it where we initialize systick. I will hardcode a macro for now
+//		tcbs[g_sleepingThreads[i]].SleepCtr -= SYSTICK_PERIOD;
+//		
+//		// come out of sleep state to the active thread state and put 
+//		// it back in round robin for the scheduler, where should it go???
+//		// Is there a preferrable way to do this? Run it first???
+//		//KL 2/21
+//		//We can leave sleeping threads in the linked list if we want and just execute
+//		//this everytime a Systick is called. This isn't the most efficient but I remember it was mentioned in class
+//		//for(0:number of threads){
+//		//	if(sleep_counter>=0)
+//		//    decrement sleep_counter
+//		// }
+//		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
+//		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
+//		// should we run the lowest sleepCtr value first???
+//		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
+//		{
+//			threadsAwakened++;
+//			// Add to scheduler
+//			// we also need to make sure there isn't an interrupt driven
+//			// periodic thread that is trying to access this value, need a mutex
+//			// problem is we would need one for each variable in each tcb not just 
+//			// one mutex for all of them, bc others could change if they aren't accessing
+//			// this particular sleepCtr. Or should we just StartCritical-EndCritical???
+//			//OS_bWait(&semaphoreSleep0) // need more, not sure how to do this
+//			// tcbs[g_sleepingThreads[i]].SleepCtr = 0;
+//			//OS_bSignal(&semaphoreSleep0);
+//		
+//			tcbs[g_sleepingThreads[i]].next = RunPt->next; // insert thread between current thread and next thread
+//			tcbs[g_sleepingThreads[i]].previous = RunPt; // give the added thread a next and previous tcb
+//			
+//			// update other tcbs in the Linked list
+//			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
+//			RunPt->next = &tcbs[g_sleepingThreads[i]];
+//		}			
+
 	}
 
-	g_numSleepingThreads -= threadsAwakened; // update number of sleeping threads
-
+	// moves RunPt to first Active thread
+//	while(RunPt->next->SleepCtr > 0)
+//	{
+//		// cant change RunPt bc only PendSV should be doing
+//		// context switches, only change the next/previous 
+//		//states for RunPt
+//		RunPt->next = RunPt->next->next;
+//	}
+	
+	
+	
+//	g_numSleepingThreads -= threadsAwakened; // update number of sleeping threads
 	
 	// next do the context switch - currently round robin
 	//PendSV_Handler();
