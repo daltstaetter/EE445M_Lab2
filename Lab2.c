@@ -63,6 +63,10 @@ unsigned long JitterHistogram[JITTERSIZE]={0,};
 #define PE1  (*((volatile unsigned long *)0x40024008))
 #define PE2  (*((volatile unsigned long *)0x40024010))
 #define PE3  (*((volatile unsigned long *)0x40024020))
+#define PE4  (*((volatile unsigned long *)0x40024040))
+#define PE5  (*((volatile unsigned long *)0x40024080))
+#define PE6  (*((volatile unsigned long *)0x40024100))
+	
 
 void PortE_Init(void){ 
 	
@@ -70,11 +74,11 @@ void PortE_Init(void){
 	SYSCTL_RCGCGPIO_R  |= SYSCTL_RCGC2_GPIOE;       // activate port E
   delay = SYSCTL_RCGC2_R;        
   delay = SYSCTL_RCGC2_R;         
-  GPIO_PORTE_DIR_R |= 0x0F;    // make PE3-0 output heartbeats
-  GPIO_PORTE_AFSEL_R &= ~0x0F;   // disable alt funct on PE3-0
-  GPIO_PORTE_DEN_R |= 0x0F;     // enable digital I/O on PE3-0
+  GPIO_PORTE_DIR_R |= 0x7F;    // make PE6-0 output heartbeats
+  GPIO_PORTE_AFSEL_R &= ~0x7F;   // disable alt funct on PE6-0
+  GPIO_PORTE_DEN_R |= 0x7F;     // enable digital I/O on PE6-0
   GPIO_PORTE_PCTL_R = ~0x0000FFFF;
-  GPIO_PORTE_AMSEL_R &= ~0x0F;;      // disable analog functionality on PE
+  GPIO_PORTE_AMSEL_R &= ~0x7F;;      // disable analog functionality on PE
 }
 //------------------Task 1--------------------------------
 // 2 kHz sampling ADC channel 1, using software start trigger
@@ -398,7 +402,7 @@ int Testmain1(void){  // Testmain1
 // no timer interrupts
 // no switch interrupts
 // no ADC serial port or LCD output
-// no calls to semaphores
+//no calls to semaphores
 void Thread1b(void){
 	int i;
   Count1 = 0;          
@@ -406,6 +410,8 @@ void Thread1b(void){
     PE0 ^= 0x01;       // heartbeat
 //		ST7735_Message (0, 0, "Thread ", 0);
     Count1++;
+		OS_Kill();
+		//OS_Sleep(0);
 		//for (i=0;i<10000;i++){}
   }
 }
@@ -417,7 +423,10 @@ void Thread2b(void){
     PE1 ^= 0x02;       // heartbeat
 //		ST7735_Message (0, 1, "Thread ", 1);
     Count2++;
-		//for (i=0;i<10000;i++){}
+	//	OS_Sleep(00);
+		//for (i=0;i<100000;i++){}
+			PE1 = 0;
+			OS_Kill();
   }
 }
 void Thread3b(void){
@@ -427,8 +436,12 @@ void Thread3b(void){
     PE2 ^= 0x04;       // heartbeat
 //		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
+		
+		//OS_Sleep(7);
 	//	OS_Sleep(1000000);
-		//for (i=0;i<10000;i++){}
+		//for (i=0;i<50000;i++){}
+			PE2 = 0x00;
+			OS_Kill();
   }
 }
 
@@ -436,11 +449,14 @@ void Thread4b(void){
 	int i;
   Count4 = 0;          
   for(;;){
-    //PE2 ^= 0x04;       // heartbeat
+    PE3 ^= 0xFF;       // heartbeat
 //		ST7735_Message (0, 2, "Thread ", 2);
     Count4++;
-		OS_Sleep(1);
+		
+		//OS_Sleep(9);
 		//for (i=0;i<10000;i++){}
+			PE3 = 0;
+			OS_Kill();
   }
 }
 
@@ -460,7 +476,7 @@ int main(void){  // Testmain2
   // Count1 Count2 Count3 should be equal on average
   // counts are larger than testmain1
  
-  OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
+  OS_Launch(TIME_1MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes
 }
 

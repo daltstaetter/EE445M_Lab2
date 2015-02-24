@@ -52,7 +52,15 @@ PendSV_Handler
     LDR     R0, =RunPt         ; 4) R0=pointer to RunPt, old thread
     LDR     R1, [R0]           ;    R1 = RunPt
     STR     SP, [R1]           ; 5) Save SP into TCB
-    LDR     R1, [R1,#4]        ; 6) R1 = RunPt->next
+	
+	; this skips sleeping threads
+sleeping					   ; KL & DA pg 189 
+	LDR R1, [R1,#4]			   ; R1 = RunPt, [R1,#4] = RunPt->next
+	LDR R2, [R1, #16]          ; [R1, #16] = RunPt->SleepCtr
+	CMP	R2,	#0                 ; if sleeping skip, go to RunPt->next until SleepCtr == 0
+	BNE	sleeping
+	; end of our added routine
+	
     STR     R1, [R0]           ;    RunPt = R1
     LDR     SP, [R1]           ; 7) new thread SP; SP = RunPt->sp;
     POP     {R4-R11}           ; 8) restore regs r4-11
@@ -74,6 +82,14 @@ StartOS
     POP     {R1}               ; discard PSR
     CPSIE   I                  ; Enable interrupts at processor level
     BX      LR                 ; start first thread
+
+
+;sleeping
+;	LDR R1, [R1,#4]
+;	LDR R2, [R1, #8]
+;	CMP	R2,	#0
+;	BNE	sleeping
+
 
 ; Does a periodic context switch
 ;SysTick_Handler
