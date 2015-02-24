@@ -439,7 +439,7 @@ void Thread4b(void){
     //PE2 ^= 0x04;       // heartbeat
 //		ST7735_Message (0, 2, "Thread ", 2);
     Count4++;
-		OS_Sleep(1);
+		OS_Sleep(5);
 		//for (i=0;i<10000;i++){}
   }
 }
@@ -491,7 +491,7 @@ void Thread2c(void){
   Count2 = 0;    
   Count5 = 0;    // Count2 + Count5 should equal Count1  
   NumCreated += OS_AddThread(&Thread5c,128,3); 
-  OS_AddPeriodicThread(&BackgroundThread1c,1,TIME_1MS,0); 
+  OS_AddPeriodicThread(&BackgroundThread1c,1,1000,0); 
   for(;;){
     OS_Wait(&Readyc);
     Count2++;   // Count2 + Count5 should equal Count1
@@ -586,7 +586,7 @@ int Testmain4(void){   // Testmain4
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
   OS_AddPeriodicThread(&BackgroundThread1d,1,PERIOD,0); 
-  OS_AddSW1Task(&BackgroundThread5d,2);
+  OS_AddSwitchTasks(&BackgroundThread5d,&DoNothing,2);
   NumCreated += OS_AddThread(&Thread2d,128,2); 
   NumCreated += OS_AddThread(&Thread3d,128,3); 
   NumCreated += OS_AddThread(&Thread4d,128,3); 

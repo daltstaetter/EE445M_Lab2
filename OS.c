@@ -22,7 +22,7 @@ void StartOS(void);
 #define MAILBOX_EMPTY	0
 #define MAILBOX_FULL	1
 
-#define NUMTHREADS 3
+#define NUMTHREADS 6
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -332,11 +332,11 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 void OS_Sleep(unsigned long sleepTime){
 	int32_t status = StartCritical();
 	RunPt->SleepCtr = sleepTime; // atomic operation
-	g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
+	//g_sleepingThreads[g_numSleepingThreads++] = RunPt->ID; 
 	// store an array containing the ID's of sleeping threads
 	// this can be used to create a linked list of sleeping threads
-	RunPt->previous->next = RunPt->next; //Link the prior thread to the next thread
-	RunPt->next->previous = RunPt->previous;
+	//RunPt->previous->next = RunPt->next; //Link the prior thread to the next thread
+	//RunPt->next->previous = RunPt->previous;
 	EndCritical(status);
 	OS_Suspend();
 }
@@ -708,8 +708,6 @@ void SysTick_Handler(void)
 			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
 			RunPt->next = &tcbs[g_sleepingThreads[i]];
 			awakenedThreads++;
-			//tcbs[g_sleepingThreads[i]].next->previous->next = &tcbs[g_sleepingThreads[i]]; // insert thread between current thread and next thread
-			//tcbs[g_sleepingThreads[i]].previous->next->previous = &tcbs[g_sleepingThreads[i]]; // give the added thread a next and previous tcb
 		}			
 	}
 
