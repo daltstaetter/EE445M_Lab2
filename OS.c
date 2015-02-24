@@ -228,7 +228,7 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 	return 0;
 }
 
-//******** OS_AddSW1Task *************** 
+//******** OS_AddSWwitchTasks *************** 
 // add a background task to run whenever the SW1 (PF4) button is pushed
 // Inputs: pointer to a void/void background function
 //         priority 0 is the highest, 5 is the lowest
@@ -241,10 +241,70 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 // In lab 2, the priority field can be ignored
 // In lab 3, there will be up to four background threads, and this priority field 
 //           determines the relative priority of these four threads
-int OS_AddSW1Task(void(*task)(void), unsigned long priority){
-	;
+#define PF0       (*((volatile uint32_t *)0x40025004))
+#define PF4       (*((volatile uint32_t *)0x40025040))
+void (*PF4Task) (void);
+void (*PF0Task) (void);
+uint32_t static LastPF4, LastPF0;
+int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long priority){
+	uint32_t delay;
+	SYSCTL_RCGCGPIO_R |= 0x00000020;  // activate clock for Port F
+  delay = SYSCTL_RCGCGPIO_R;        // allow time for clock to start
+	PF4Task = task1;
+	PF0Task = task2;
+  GPIO_PORTF_LOCK_R = 0x4C4F434B;   // unlock GPIO Port F
+  GPIO_PORTF_CR_R = 0x1F;           // allow changes to PF4-0
+  // only PF0 needs to be unlocked, other bits can't be locked
+  GPIO_PORTF_AMSEL_R &= ~0x11;        // isable analog on PF
+  GPIO_PORTF_PCTL_R |= 0x11;   // PCTL GPIO on PF4,PF0
+  GPIO_PORTF_DIR_R &= ~0x11;          // PF4,PF0 in
+  GPIO_PORTF_AFSEL_R &= ~0x11;        // disable alt funct on PF4-0
+  GPIO_PORTF_PUR_R |= 0x11;          // enable pull-up on PF0 and PF4
+  GPIO_PORTF_DEN_R |= 0x11;          // enable digital I/O on PF4,PF0
+	GPIO_PORTF_IS_R &= ~0x11;					//PF4,PF0 are edge sensitive
+	GPIO_PORTF_IBE_R |= 0x11;					//Interrupt on both edges
+	GPIO_PORTF_ICR_R |= 0x11;					//clear flags
+	GPIO_PORTF_IM_R |= 0x11; 					//Arm interrupts
+	NVIC_PRI7_R = (NVIC_PRI7_R&NVIC_PRI7_INT30_M)|(priority<<NVIC_PRI7_INT30_S);
+	NVIC_EN0_R = NVIC_EN0_INT30;
 }
 
+void static DebounceTask(void){
+	uint32_t pin;
+	OS_Sleep(2);
+	pin = GPIO_PORTF_RIS_R|=0x11;
+	if(pin==0x10){
+		LastPF4 = PF4;
+		GPIO_PORTF_ICR_R |= 0x10;
+		GPIO_PORTF_IM_R |= 0x10;
+		OS_Kill();
+	}
+	if(pin==0x01){
+		LastPF0 = PF0;
+		GPIO_PORTF_ICR_R |= 0x01;
+		GPIO_PORTF_IM_R |= 0x01;
+		OS_Kill();
+	}
+}
+void GPIOPortF_Handler(void){
+	uint32_t pin;
+	pin = GPIO_PORTF_RIS_R|0x11;
+	if(pin==0x10){  //PF4 pressed
+		if(LastPF4==0){
+			(*PF4Task)();
+		}
+		GPIO_PORTF_IM_R &= ~0x10;	//disarm interrupt on PF4
+		OS_AddThread(&DebounceTask,128,1);
+	}
+	if(pin==0x01){
+		if(LastPF0==0){
+			(*PF0Task)();
+		}
+		GPIO_PORTF_IM_R &= ~0x01;	//disarm interrupt on PF0
+		OS_AddThread(&DebounceTask,128,1);
+	}
+}
+//Ignore for now
 //******** OS_AddSW2Task *************** 
 // add a background task to run whenever the SW2 (PF0) button is pushed
 // Inputs: pointer to a void/void background function
