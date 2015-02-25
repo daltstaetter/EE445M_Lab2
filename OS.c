@@ -269,7 +269,7 @@ unsigned long OS_Id(void){
 }
 
 
-
+void OS_LaunchThread(void(*taskPtr)(void), int timer);
 // initializes a new thread with given period and priority
 int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, unsigned long priority)
 {// period and priority are used when initializing the timer interrupts
@@ -282,10 +282,12 @@ int OS_AddPeriodicThread(void(*task)(void), int timer, unsigned long period, uns
 	
 	status = 0;
 	status = TIMER_TimerInit(task,timer, period, priority);
+	
 	if(status == -1)
 	{
 		//printf("Error Initializing timer number(0-11): %d\n", timer);
 	}
+	OS_LaunchThread(task,timer);
 	EndCritical(sr);
 	return 0;
 }

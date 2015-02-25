@@ -456,7 +456,7 @@ int Switch2Count=0;
 	 Switch2Count++;
  }
 
-int main(void){  // Testmain2
+int Testmain2(void){  // Testmain2
 
 	OS_Init();           // initialize, disable interrupts
 	//OS_InitSemaphore(&LCDmutex,1);
@@ -502,7 +502,7 @@ void Thread2c(void){
   Count2 = 0;    
   Count5 = 0;    // Count2 + Count5 should equal Count1  
   NumCreated += OS_AddThread(&Thread5c,128,3); 
-  OS_AddPeriodicThread(&BackgroundThread1c,1,1000,0); 
+  OS_AddPeriodicThread(&BackgroundThread1c,4,1000,0);
   for(;;){
     OS_Wait(&Readyc);
     Count2++;   // Count2 + Count5 should equal Count1
@@ -540,7 +540,7 @@ int Testmain3(void){   // Testmain3
   NumCreated += OS_AddThread(&Thread2c,128,2); 
   NumCreated += OS_AddThread(&Thread3c,128,3); 
   NumCreated += OS_AddThread(&Thread4c,128,3); 
-  OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
+  OS_Launch(TIME_1MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes
 }
 
@@ -592,17 +592,17 @@ void Thread4d(void){ int i;
 
 void doNothing(void)
 {
-	
+	;
 }
 
 void BackgroundThread5d(void){   // called when Select button pushed
   NumCreated += OS_AddThread(&Thread4d,128,3); 
 }
-int Testmain4(void){   // Testmain4
+int main(void){   // Testmain4
   Count4 = 0;          
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
-  OS_AddPeriodicThread(&BackgroundThread1d,1,PERIOD,0); 
+  OS_AddPeriodicThread(&BackgroundThread1d,2,1000,0); 
 
   OS_AddSwitchTasks(&BackgroundThread5d,&doNothing,2);
 
