@@ -65,9 +65,6 @@ Sema4Type LCDmutex;
 unsigned long g_mailboxData;
 unsigned long* g_ulFifo; // pointer to OS_FIFO
 
-unsigned long g_getIndex; // get ptr for OS_FIFO
-unsigned long g_putIndex; // put ptr for OS_FIFO
-
 void SetInitialStack(int i){
   tcbs[i].sp = &Stacks[i][STACKSIZE-16]; // thread stack pointer
   Stacks[i][STACKSIZE-1] = 0x01000000;   // thumb bit

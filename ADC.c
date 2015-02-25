@@ -107,10 +107,17 @@ void WaitForInterrupt(void);  // low power mode
 // SS3 triggering event: Timer0A
 // SS3 1st sample source: programmable using variable 'channelNum' [0:11]
 // SS3 interrupts: enabled and promoted to controller
+
+#define FS 400            // producer/consumer sampling
+#define RUNLENGTH (20*FS) // display results and quit when NumSamples==RUNLENGTH
+
+extern unsigned long NumSamples;
+void (*ADC_Task)(unsigned long);
 volatile uint32_t NumberOfSamples=0;
 volatile uint16_t* Buffer;
 volatile uint32_t Status=1;
-void ADC_Collect(uint8_t channelNum, uint32_t fs, uint16_t buffer[],uint32_t numberOfSamples){
+//void ADC_Collect(uint8_t channelNum, uint32_t fs, uint16_t buffer[],uint32_t numberOfSamples){
+void ADC_Collect(uint8_t channelNum, uint32_t fs, void(*task)(unsigned long)){
   volatile uint32_t delay;
   // **** GPIO pin initialization ****
   switch(channelNum){             // 1) activate clock
@@ -230,8 +237,9 @@ void ADC_Collect(uint8_t channelNum, uint32_t fs, uint16_t buffer[],uint32_t num
   ADC0_ACTSS_R |= 0x08;          // enable sample sequencer 3
   NVIC_PRI4_R = (NVIC_PRI4_R&0xFFFF00FF)|0x00004000; //priority 2
   NVIC_EN0_R = 1<<17;              // enable interrupt 17 in NVIC
-	NumberOfSamples = numberOfSamples;
-	Buffer = buffer;
+	//NumberOfSamples = numberOfSamples;
+	//Buffer = buffer
+	ADC_Task = task;
   EnableInterrupts();
 }
 volatile uint32_t ADCvalue;
@@ -240,14 +248,26 @@ void ADC0Seq3_Handler(void){
 	long sr;
   ADC0_ISC_R = 0x08;          // acknowledge ADC sequence 3 completion
 	sr = StartCritical();
-  Buffer[i] = ADC0_SSFIFO3_R;  // 12-bit result
-	if(i==NumberOfSamples){
+  //Buffer[i] = ADC0_SSFIFO3_R;  // 12-bit result
+ (*ADC_Task)(ADC0_SSFIFO3_R);
+	
+	if(NumSamples >= RUNLENGTH)
+	{
 		Status=1;							//ADC conversion complete
 		ADC0_IM_R &= ~0x08;             // disable SS3 interrupts when buffer is full
-	}else{
-		Status=0;							//ADC still filling buffer
-		i++;
 	}
+	else
+	{
+		Status = 0;
+	}
+	
+//	if(i==NumberOfSamples){
+//		Status=1;							//ADC conversion complete
+//		ADC0_IM_R &= ~0x08;             // disable SS3 interrupts when buffer is full
+//	}else{
+//		Status=0;							//ADC still filling buffer
+//		i++;
+//	}
 	EndCritical(sr);
 }
 

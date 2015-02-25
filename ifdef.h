@@ -2,6 +2,6 @@
 
 #define TASKS
 //#define FINAL
-//#define INTERPRETER
+#define INTERPRETER
 #define DEBUG
 #define SYSTICK

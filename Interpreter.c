@@ -35,7 +35,10 @@
 #include <rt_misc.h>
 #include <string.h>
 #include "OS.h"
+#include "ifdef.h"
 //#define INTERPRETER
+
+int Interpreter(void);
 
 struct __FILE { int handle; /* Add whatever you need here */ };
 FILE __stdout;
@@ -106,11 +109,11 @@ int main2(void){
 }
 #ifdef INTERPRETER
 uint16_t TestBuffer[64];
-int InterpreterTestMain(void){
+int Interpreter(void){
 	char input_str[30];
 	int input_num,i,device,line;
 	int freq, numSamples;
-	PLL_Init();
+	//PLL_Init();
 	UART_Init();              // initialize UART
 	Output_Init();						// initialize LCD
 	//GPIO_PortF_Init();				// initialize PortF
@@ -167,7 +170,8 @@ int InterpreterTestMain(void){
 			freq=UART_InUDec();
 			printf("\n\rNumber of Samples: ");
 			numSamples=UART_InUDec();
-			ADC_Collect(input_num,freq,TestBuffer,numSamples);
+			//ADC_Collect(input_num,freq,TestBuffer,numSamples);
+			
 		}
 		
 		else if(!strcmp(input_str,"ADC_Status")){

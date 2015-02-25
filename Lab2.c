@@ -31,6 +31,8 @@
 #include <string.h> 
 #include "ifdef.h"
 
+extern int Interpreter(void);
+
 //#define INTERPRETER // cleared in ifdef.h
 //#define TASKS // set in ifdef.h
 //#define DEBUG // set in ifdef.h
@@ -221,15 +223,18 @@ void Display(void);
 // calculates FFT, sends DC component to Display
 // inputs:  none
 // outputs: none
-void Consumer(void){ 
-unsigned long data,DCcomponent;   // 12-bit raw ADC sample, 0 to 4095
-unsigned long t;                  // time in 2.5 ms
-unsigned long myId = OS_Id(); 
-  //ADC_Collect(5, FS, &Producer); // start ADC sampling, channel 5, PD2, 400 Hz                /********Change ADC_Collect*****/
+void Consumer(void)
+{ 
+	unsigned long data,DCcomponent;   // 12-bit raw ADC sample, 0 to 4095
+	unsigned long t;                  // time in 2.5 ms
+	unsigned long myId = OS_Id(); 
+  ADC_Collect(4, FS, &Producer); // start ADC sampling, channel 5, PD2, 400 Hz                /********Change ADC_Collect*****/
   NumCreated += OS_AddThread(&Display,128,0); 
-  while(NumSamples < RUNLENGTH) { 
+  while(NumSamples < RUNLENGTH) 
+	{ 
     PE2 = 0x04;
-    for(t = 0; t < 64; t++){   // collect 64 ADC samples
+    for(t = 0; t < 64; t++)
+		{   // collect 64 ADC samples
       data = OS_Fifo_Get();    // get from producer
       x[t] = data;             // real part is 0 to 4095, imaginary part is 0
     }
@@ -303,7 +308,7 @@ unsigned long myId = OS_Id();
 // Interpreter is a foreground thread, accepts input from serial port, outputs to serial port
 // inputs:  none
 // outputs: none
-void Interpreter(void);    // just a prototype, link to your interpreter
+//void Interpreter(void);    // just a prototype, link to your interpreter
 // add the following commands, leave other commands, if they make sense
 // 1) print performance measures 
 //    time-jitter, number of data points lost, number of calculations performed
@@ -314,10 +319,15 @@ void Interpreter(void);    // just a prototype, link to your interpreter
 //--------------end of Task 5-----------------------------
 #endif
 
+void doNothing0(void)
+{
+	
+}
 
+#define FINAL
 #ifdef FINAL
 //*******************final user main DEMONTRATE THIS TO TA**********
-int main_final(void){ 
+int main(void){ 
   OS_Init();           // initialize, disable interrupts
   PortE_Init();
   DataLost = 0;        // lost data between producer and consumer
@@ -329,10 +339,10 @@ int main_final(void){
   OS_Fifo_Init(128);    // ***note*** 4 is not big enough*****
 
 //*******attach background tasks***********
-  OS_AddSW1Task(&SW1Push,2);
+  OS_AddSwitchTasks(&SW1Push,&doNothing0,2);
 //  OS_AddSW2Task(&SW2Push,2);  // add this line in Lab 3
-  //ADC_Init(4);  // sequencer 3, channel 4, PD3, sampling in DAS()											/*****Change ADC_Init********/
-  OS_AddPeriodicThread(&DAS,PERIOD,1); // 2 kHz real time sampling of PD3
+//  ADC_Init(4);  // sequencer 3, channel 4, PD3, sampling in DAS()											/*****Change ADC_Init********/
+  OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
 
   NumCreated = 0 ;
 // create initial foreground threads
@@ -598,7 +608,7 @@ void doNothing(void)
 void BackgroundThread5d(void){   // called when Select button pushed
   NumCreated += OS_AddThread(&Thread4d,128,3); 
 }
-int main(void){   // Testmain4
+int Testmain4(void){   // Testmain4
   Count4 = 0;          
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
