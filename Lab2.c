@@ -84,8 +84,8 @@ void PortE_Init(void){
 // 2 kHz sampling ADC channel 1, using software start trigger
 // background thread executed at 2 kHz
 // 60-Hz notch high-Q, IIR filter, assuming fs=2000 Hz
-// y(n) = (256x(n) -503x(n-1) + 256x(n-2) + 498y(n-1)-251y(n-2))/256 (2k sampling)
-// y(n) = (256x(n) -476x(n-1) + 256x(n-2) + 471y(n-1)-251y(n-2))/256 (1k sampling)
+// y(n) = (256*x(n) -503*x(n-1) + 256*x(n-2) + 498*y(n-1)-251*y(n-2))/256 (2k sampling)
+// y(n) = (256*x(n) -476*x(n-1) + 256*x(n-2) + 471*y(n-1)-251*y(n-2))/256 (1k sampling)
 long Filter(long data){
 static long x[6]; // this MACQ needs twice
 static long y[6];
@@ -104,29 +104,33 @@ static unsigned long n=3;   // 3, 4, or 5
 // inputs:  none
 // outputs: none
 unsigned long DASoutput;
-void DAS(void){ 
-unsigned long input;  
-unsigned static long LastTime;  // time at previous ADC sample
-unsigned long thisTime;         // time at current ADC sample
-long jitter;                    // time between measured and expected, in us
-  if(NumSamples < RUNLENGTH){   // finite time run
+void DAS(void)
+{ 
+	unsigned long input;  
+	unsigned static long LastTime;  // time at previous ADC sample
+	unsigned long thisTime;         // time at current ADC sample
+	long jitter;                    // time between measured and expected, in us
+  
+	if(NumSamples < RUNLENGTH)
+	{   // finite time run
     PE0 ^= 0x01;
     input = ADC_In();           // channel set when calling ADC_Init
     PE0 ^= 0x01;
     thisTime = OS_Time();       // current time, 12.5 ns
     DASoutput = Filter(input);
     FilterWork++;        // calculation finished
-    if(FilterWork>1){    // ignore timing of first interrupt
+    if(FilterWork > 1)
+		{    // ignore timing of first interrupt
       unsigned long diff = OS_TimeDifference(LastTime,thisTime);
-      if(diff>PERIOD){
-        jitter = (diff-PERIOD+4)/8;  // in 0.1 usec
-      }else{
-        jitter = (PERIOD-diff+4)/8;  // in 0.1 usec
-      }
-      if(jitter > MaxJitter){
+      
+			jitter = (diff > PERIOD) ? (diff-PERIOD+4)/8:(PERIOD-diff+4)/8; // in 0.1 usec
+			
+      if(jitter > MaxJitter)
+			{
         MaxJitter = jitter; // in usec
       }       // jitter should be 0
-      if(jitter >= JitterSize){
+      if(jitter >= JitterSize)
+			{
         jitter = JITTERSIZE-1;
       }
       JitterHistogram[jitter]++; 
@@ -142,8 +146,9 @@ long jitter;                    // time between measured and expected, in us
 // one foreground task created with button push
 // foreground treads run for 2 sec and die
 // ***********ButtonWork*************
-void ButtonWork(void){
-unsigned long myId = OS_Id(); 
+void ButtonWork(void)
+{
+	unsigned long myId = OS_Id(); 
   PE1 ^= 0x02;
   ST7735_Message(1,0,"NumCreated =",NumCreated); 
   PE1 ^= 0x02;
@@ -159,9 +164,12 @@ unsigned long myId = OS_Id();
 // Called when SW1 Button pushed
 // Adds another foreground task
 // background threads execute once and return
-void SW1Push(void){
-  if(OS_MsTime() > 20){ // debounce
-    if(OS_AddThread(&ButtonWork,100,4)){
+void SW1Push(void)
+{
+  if(OS_MsTime() > 20)
+	{ // debounce
+    if(OS_AddThread(&ButtonWork,100,4))
+		{
       NumCreated++; 
     }
     OS_ClearMsTime();  // at least 20ms between touches
