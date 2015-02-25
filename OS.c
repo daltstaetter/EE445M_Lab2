@@ -581,8 +581,9 @@ void OS_ClearMsTime(void)
 	int32_t status = StartCritical();
 	// Need to do this for SysTick since that
 	// is what we are using for the system time
-	NVIC_ST_RELOAD_R = 0;
-	NVIC_ST_CURRENT_R = 0;
+	// any write to NVIC_ST_CURRENT_R resets it to the
+	// NVIC_ST_RELOAD_R value
+	NVIC_ST_CURRENT_R = 10;
 	EndCritical(status);
 }
 
@@ -594,7 +595,30 @@ void OS_ClearMsTime(void)
 // It is ok to make the resolution to match the first call to OS_AddPeriodicThread
 unsigned long OS_MsTime(void)
 {
-	;
+	int32_t status;
+	unsigned long msTime;
+	unsigned long msTimeDiff;
+	status = StartCritical();
+	
+	msTime = NVIC_ST_CURRENT_R;
+	msTimeDiff = NVIC_ST_RELOAD_R - msTime;
+	// this is in cycles. I will use a divider
+	// of 40,000 so that I can do rounding
+	// i.e. 80,000 cycles = 1 ms,
+	// => cycles/40000 gives the number of 0.5 ms intervals
+	// that have occured.
+	msTimeDiff /= 40000;
+	if(msTimeDiff % 2)
+	{ // non-integer timeDiff => round up
+		msTimeDiff++;
+	}
+	msTimeDiff /= 2;
+	
+	// if msTimeDiff even, => rounded to an integer ms time
+	// if odd it rounded to an odd ms time which rounds up
+	
+	EndCritical(status);
+	return msTimeDiff; // it actually is in ms
 }
 
 //******** OS_Launch *************** 
