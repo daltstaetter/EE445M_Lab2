@@ -349,7 +349,7 @@ int main(void){
 // create initial foreground threads
   //NumCreated += OS_AddThread(&Interpreter,128,2); 
   NumCreated += OS_AddThread(&Consumer,128,1); 
-  //NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
+  NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
  
   OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes
@@ -424,21 +424,23 @@ int Testmain1(void){  // Testmain1
 //no calls to semaphores
 void Thread1b(void){
 	int i;
-  Count1 = 0;          
+  Count1 = 0;    
+	int mail = 0x121212;
   for(;;){
     PE0 ^= 0x01;       // heartbeat
+		OS_MailBox_Send(mail);
     Count1++;
-		
-		for(i=0; i < 100000; i++)
-		{ }
-		OS_ClearMsTime();
   }
 }
+int Mail_recv = 0;
 void Thread2b(void){
 	int i;
 	i = 0;
+	Count2 = 0;
   for(;;){
     PE1 ^= 0x02;       // heartbeat
+		Mail_recv = OS_MailBox_Recv();
+		ST7735_Message(0,0,"Mail",Mail_recv);
     Count2++;
   }
 }
@@ -470,8 +472,8 @@ int Switch2Count=0;
 int Testmain2(void){  // Testmain2
 
 	OS_Init();           // initialize, disable interrupts
-	//OS_InitSemaphore(&LCDmutex,1);
-	//Output_Init();
+	OS_MailBox_Init();
+	Output_Init();				//Initialize LCD
   PortE_Init();       // profile user threads
 
   NumCreated = 0 ;

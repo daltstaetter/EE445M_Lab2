@@ -160,6 +160,7 @@ void OS_bWait(Sema4Type *semaPt){
 	while(semaPt->Value == 0)
 	{
 		OS_EnableInterrupts();
+		OS_Suspend();										//cooperative
 		OS_DisableInterrupts();
 	}
 	// it exits while loop once 
