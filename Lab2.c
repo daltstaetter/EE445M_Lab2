@@ -424,7 +424,6 @@ void Thread1b(void){
   }
 }
 void Thread2b(void){
-	
 	int i;
 	i = 0;
   for(;;){
@@ -440,7 +439,6 @@ void Thread3b(void){
     Count3++;
   }
 }
-
 void Thread4b(void){
 	int i;
   Count4 = 0;          
@@ -449,7 +447,14 @@ void Thread4b(void){
     Count4++;
   }
 }
-
+int Switch1Count=0; 
+int Switch2Count=0;
+ void DoNothing1(void){
+	 Switch1Count++;
+ }
+ void DoNothing2(void){
+	 Switch2Count++;
+ }
 
 int main(void){  // Testmain2
 
@@ -462,7 +467,7 @@ int main(void){  // Testmain2
   NumCreated += OS_AddThread(&Thread1b,128,1); 
   NumCreated += OS_AddThread(&Thread2b,128,2); 
   NumCreated += OS_AddThread(&Thread3b,128,3);
-	NumCreated += OS_AddThread(&Thread4b,128,4);	
+	OS_AddSwitchTasks(&DoNothing1,&DoNothing2,0);	
   // Count1 Count2 Count3 should be equal on average
   // counts are larger than testmain1
  

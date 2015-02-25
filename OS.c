@@ -28,7 +28,7 @@ void StartOS(void);
 #define FREE 0
 #define USED 1
 
-#define NUMTHREADS 6
+#define NUMTHREADS 8
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -327,45 +327,57 @@ int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long prior
 	GPIO_PORTF_IBE_R |= 0x11;					//Interrupt on both edges
 	GPIO_PORTF_ICR_R |= 0x11;					//clear flags
 	GPIO_PORTF_IM_R |= 0x11; 					//Arm interrupts
+	LastPF4 = PF4;
+	LastPF0 = PF0;
 	NVIC_PRI7_R = (NVIC_PRI7_R&NVIC_PRI7_INT30_M)|(priority<<NVIC_PRI7_INT30_S);
 	NVIC_EN0_R = NVIC_EN0_INT30;
 	return 1;
 }
 
-void static DebounceTask(void){
-	uint32_t pin;
+void static DebounceSW1Task(void){
+	long sr;
 	OS_Sleep(2);
-	pin = GPIO_PORTF_RIS_R|=0x11;			//which switch to debounce?
-	if(pin==0x10){
-		LastPF4 = PF4;									//Store current value of switch
-		GPIO_PORTF_ICR_R |= 0x10;				//acknowledge interrupt
-		GPIO_PORTF_IM_R |= 0x10;				//Re-arm interrupt
-		OS_Kill();
-	}
-	if(pin==0x01){
-		LastPF0 = PF0;									//Store current value of switch 
-		GPIO_PORTF_ICR_R |= 0x01;				//acknowledge
-		GPIO_PORTF_IM_R |= 0x01;				//Re-arm
-		OS_Kill();
-	}
+	sr = StartCritical();
+	LastPF4 = PF4;									//Store current value of switch
+	GPIO_PORTF_ICR_R |= 0x10;				//acknowledge interrupt
+	GPIO_PORTF_IM_R |= 0x10;				//Re-arm interrupt
+	EndCritical(sr);
+	OS_Kill();
 }
+
+void static DebounceSW2Task(void){
+	long sr;
+	OS_Sleep(2);
+	sr = StartCritical();
+	LastPF0 = PF0;									//Store current value of switch
+	GPIO_PORTF_ICR_R |= 0x01;				//acknowledge
+	GPIO_PORTF_IM_R |= 0x01;				//Re-arm
+	EndCritical(sr);
+	OS_Kill();
+}
+int interrupt_count = 0;
 void GPIOPortF_Handler(void){
 	uint32_t pin;
-	pin = GPIO_PORTF_RIS_R|0x11;   //which switch triggered the interrupt?
+	long sr;
+	sr = StartCritical();
+	interrupt_count++;
+	pin = GPIO_PORTF_RIS_R&0x11;   //which switch triggered the interrupt?
+	GPIO_PORTF_ICR_R |= pin;				//acknowledge
 	if(pin==0x10){  //PF4 pressed
-		if(LastPF4==0){				//If rising edge, execute user task
+		if(LastPF4==0x10){				//If rising edge, execute user task
 			(*PF4Task)();		
 		}
-		GPIO_PORTF_IM_R &= ~0x10;	//disarm interrupt on PF4
-		OS_AddThread(&DebounceTask,128,1);
+		GPIO_PORTF_IM_R &= ~pin;	//disarm interrupt on PF4
+		OS_AddThread(&DebounceSW1Task,128,1);
 	}
 	if(pin==0x01){
-		if(LastPF0==0){				//If rising edge, execute user task
+		if(LastPF0==0x01){				//If rising edge, execute user task
 			(*PF0Task)();
 		}
-		GPIO_PORTF_IM_R &= ~0x01;	//disarm interrupt on PF0
-		OS_AddThread(&DebounceTask,128,1);
+		GPIO_PORTF_IM_R &= ~pin;	//disarm interrupt on PF0
+		OS_AddThread(&DebounceSW2Task,128,1);
 	}
+	EndCritical(sr);
 }
 //Ignore for now
 //******** OS_AddSW2Task *************** 
@@ -427,11 +439,13 @@ void OS_Kill(void){
 		// to the current node's nextPtr
 		
 		RunPt->sp = NULL;
+		tcbs[g_NumAliveThreads].MemStatus = FREE;
 		// release reference to stack pointer
 		g_NumAliveThreads--;
 		EndCritical(status);
 		OS_Suspend();
 	}
+	EndCritical(status);
 }
 
 // ******** OS_Suspend ************
