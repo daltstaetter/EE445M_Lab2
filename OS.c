@@ -22,6 +22,9 @@ void StartOS(void);
 #define MAILBOX_EMPTY	0
 #define MAILBOX_FULL	1
 
+#define DATA_VALID 1
+#define DATA_NOT_VALID 0
+
 #define FREE 0
 #define USED 1
 
@@ -42,13 +45,24 @@ tcbType *RunPt;
 int32_t Stacks[NUMTHREADS][STACKSIZE];
 int32_t g_sleepingThreads[NUMTHREADS];
 int32_t g_numSleepingThreads = 0;
+Sema4Type g_mailboxDataValid, g_mailboxFree;
+Sema4Type g_dataAvailable, g_roomLeft, g_fifoMutex;
+
+#define FIFOMAXSIZE 128
+#define FIFO_SUCCESS 1
+#define FIFO_FAIL 0
+unsigned long *g_fifoPutPtr, *g_fifoGetPtr;
+unsigned long Fifo[FIFOMAXSIZE];
+unsigned long* g_Fifo;
+unsigned int g_FIFOSIZE;
+
+
 
 volatile int mutex;
 volatile int RoomLeft;
 volatile int CurrentSize;
 Sema4Type LCDmutex;
 unsigned long g_mailboxData;
-int32_t g_mailboxFlag;
 unsigned long* g_ulFifo; // pointer to OS_FIFO
 
 unsigned long g_getIndex; // get ptr for OS_FIFO
@@ -151,6 +165,8 @@ void OS_bWait(Sema4Type *semaPt){
 		OS_EnableInterrupts();
 		OS_DisableInterrupts();
 	}
+	// it exits while loop once 
+	// semaphore has been signaled
 	semaPt->Value = 0;
 	OS_EnableInterrupts();
 }
@@ -430,6 +446,7 @@ void OS_Suspend(void){
 	long sr = StartCritical();
 	sysreg = NVIC_SYS_HND_CTRL_R;
 	NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV; // does a contex switch 
+	OS_ClearMsTime(); // reset SysTick period
 	EndCritical(sr);
 }
  
@@ -442,13 +459,14 @@ void OS_Suspend(void){
 // In Lab 3, you can put whatever restrictions you want on size
 //    e.g., 4 to 64 elements
 //    e.g., must be a power of 2,4,8,16,32,64,128
-void OS_Fifo_Init(unsigned long size){
-
+void OS_Fifo_Init(unsigned long size)
+{
+	g_FIFOSIZE = size;
 	// does this need to be protected???
 	// will it only be called at the beginning
-	g_ulFifo = (unsigned long*) malloc(sizeof(unsigned long) * size);
-	g_putIndex = 0;
-	g_getIndex = 0;
+	g_Fifo = &Fifo[0];
+	g_fifoPutPtr = &g_Fifo[0];
+	g_fifoGetPtr = &g_Fifo[0];
 }
 
 // ******** OS_Fifo_Put ************
@@ -459,14 +477,62 @@ void OS_Fifo_Init(unsigned long size){
 //          false if data not saved, because it was full
 // Since this is called by interrupt handlers 
 //  this function can not disable or enable interrupts
-int OS_Fifo_Put(unsigned long data){;} 
+int OS_Fifo_Put(unsigned long data)
+{
+	int32_t status;
+	unsigned long* nextPutPtr;
+	nextPutPtr = g_fifoPutPtr + 1;
+	
+	OS_Wait(&g_roomLeft);
+	OS_bWait(&g_fifoMutex); 
+	
+	if(nextPutPtr == &g_Fifo[g_FIFOSIZE])
+	{ //wrap
+		nextPutPtr = &g_Fifo[0];
+	}
+	if(nextPutPtr == g_fifoGetPtr)
+	{ // check for full FIFO
+		// You DON'T want to call OS_Signal(&g_dataAvailable 
+		// if you didn't add more data to the fifo 
+		status = FIFO_FAIL;
+		OS_bSignal(&g_fifoMutex); // release lock on g_fifoPutPtr
+	}
+	else
+	{ // only add data and update pointer if room left
+		
+		status = FIFO_SUCCESS;
+		*(g_fifoPutPtr) = data; // store data at current index
+		g_fifoPutPtr = nextPutPtr; // update PutPtr
+		OS_bSignal(&g_fifoMutex); // release lock on g_fifoPutPtr
+		OS_Signal(&g_dataAvailable); // signal you added data to the fifo and its ready to be read
+	}
+	return status;
+
+} 
 
 // ******** OS_Fifo_Get ************
 // Remove one data sample from the Fifo
 // Called in foreground, will spin/block if empty
 // Inputs:  none
 // Outputs: data 
-unsigned long OS_Fifo_Get(void){;}
+unsigned long OS_Fifo_Get(void)
+{
+	unsigned long data;
+	
+	OS_Wait(&g_dataAvailable); // make sure there is no underflow & there is an element in the fifo to get
+	OS_bWait(&g_fifoMutex); // lock out the g_fifoGetPtr from all other threads
+	data = *(g_fifoGetPtr++); // get the data, then move to next index in fifo
+	
+	if(g_fifoGetPtr == &g_Fifo[g_FIFOSIZE])
+	{ // wrap
+		g_fifoGetPtr = &g_Fifo[0];
+	}
+	
+	OS_bSignal(&g_fifoMutex); // release lock on g_fifoGetPtr
+	OS_Signal(&g_roomLeft);
+	
+	return data;
+}
 
 // ******** OS_Fifo_Size ************
 // Check the status of the Fifo
@@ -475,7 +541,10 @@ unsigned long OS_Fifo_Get(void){;}
 //          greater than zero if a call to OS_Fifo_Get will return right away
 //          zero or less than zero if the Fifo is empty 
 //          zero or less than zero if a call to OS_Fifo_Get will spin or block
-long OS_Fifo_Size(void){;}
+long OS_Fifo_Size(void)
+{
+	return g_roomLeft.Value;
+}
 
 // DA 2/20
 // ******** OS_MailBox_Init ************
@@ -483,12 +552,13 @@ long OS_Fifo_Size(void){;}
 // Clear mailboxData and set flag to empty
 // Inputs:  none
 // Outputs: none
-void OS_MailBox_Init(void){
-
+void OS_MailBox_Init(void)
+{
 	int32_t status;
 	status = StartCritical();
 	g_mailboxData = 0;
-	g_mailboxFlag = MAILBOX_EMPTY;
+	g_mailboxFree.Value = MAILBOX_EMPTY; // valid data can be put into mailbox
+	g_mailboxDataValid.Value = DATA_NOT_VALID; //valid data hasn't been put into mailbox yet
 	EndCritical(status);
 }
 
@@ -499,11 +569,11 @@ void OS_MailBox_Init(void){
 // Outputs: none
 // This function will be called from a foreground thread
 // It will spin/block if the MailBox contains data not yet received 
-void OS_MailBox_Send(unsigned long data){
-	// don't have to worry about critical sections when writing/reading
-	// data bc the Flag synchronizes/locks the shared resource
+void OS_MailBox_Send(unsigned long data)
+{	
+	OS_bWait(&g_mailboxFree); // make sure the previous data was received before sending more
 	g_mailboxData = data;
-	g_mailboxFlag = MAILBOX_FULL;
+	OS_bSignal(&g_mailboxDataValid); // indicate that we just sent new data
 }
 
 // DA 2/20
@@ -513,15 +583,15 @@ void OS_MailBox_Send(unsigned long data){
 // Outputs: data received
 // This function will be called from a foreground thread
 // It will spin/block if the MailBox is empty 
-unsigned long OS_MailBox_Recv(void){
-
-	g_mailboxFlag = MAILBOX_EMPTY;
-	// I am worried about a critical section if it interrupts
-	// here and it signifies the mbox empty when it has data that
-	// hasn't been read and hasn't yet returned. It depends on how
-	// it is used which determines if it is critical or not since you can't 
-	// release the resource after you've returned
-	return g_mailboxData;
+unsigned long OS_MailBox_Recv(void)
+{
+	unsigned long data;
+	
+	OS_bWait(&g_mailboxDataValid); // make sure the data was sent & mailbox is full before reading
+	data = g_mailboxData;
+	OS_bSignal(&g_mailboxFree); // signal that the mailbox is empty and can accept new data
+	
+	return data;
 }
 
 // ******** OS_Time ************
@@ -580,29 +650,14 @@ void OS_ClearMsTime(void)
 // You are free to select the time resolution for this function
 // It is ok to make the resolution to match the first call to OS_AddPeriodicThread
 unsigned long OS_MsTime(void)
-{
+{ // this is the msTime since the last systick interrupt
 	int32_t status;
-	unsigned long msTime;
 	unsigned long msTimeDiff;
 	status = StartCritical();
 	
-	msTime = NVIC_ST_CURRENT_R;
-	msTimeDiff = NVIC_ST_RELOAD_R - msTime;
-	// this is in cycles. I will use a divider
-	// of 40,000 so that I can do rounding
-	// i.e. 80,000 cycles = 1 ms,
-	// => cycles/40000 gives the number of 0.5 ms intervals
-	// that have occured.
-	msTimeDiff /= 40000;
-	if(msTimeDiff % 2)
-	{ // non-integer timeDiff => round up
-		msTimeDiff++;
-	}
-	msTimeDiff /= 2;
-	
-	// if msTimeDiff even, => rounded to an integer ms time
-	// if odd it rounded to an odd ms time which rounds up
-	
+	msTimeDiff = OS_TimeDifference(NVIC_ST_RELOAD_R,NVIC_ST_CURRENT_R);
+	msTimeDiff = (msTimeDiff + 40000)/80000; // gives a resolution of ms 80MHz/80kHz = 1000
+		
 	EndCritical(status);
 	return msTimeDiff; // it actually is in ms
 }
@@ -650,18 +705,20 @@ unsigned long OS_ReadTimerValue(int timer)
 	return TIMER_ReadTimerValue(timer); 
 }
 
-// enables interrupts in the NVIC vector table
+// enables Timer interrupts in the NVIC vector table
 void OS_NVIC_EnableTimerInt(int timer)
 {
 	TIMER_NVIC_EnableTimerInt(timer);
 }
 
-
+// disables Timer interrupts in the NVIC vector table
 void OS_NVIC_DisableTimerInt(int timer)
 {
 	TIMER_NVIC_DisableTimerInt(timer);
 }
 
+// begin the timers and start the task in the interrupt
+// the function ptr isn't necessary here for the periodic threads
 void OS_LaunchThread(void(*taskPtr)(void), int timer)
 {
 	int timerN;
@@ -675,6 +732,7 @@ void OS_LaunchThread(void(*taskPtr)(void), int timer)
 	//(*taskPtr)(); // begin task for this thread Do this in the ISR
 }
 
+// disable periodic timer interrupt 
 void OS_StopThread(void(*taskPtr)(void), int timer)
 {
 	int timerN;

@@ -417,6 +417,10 @@ void Thread1b(void){
   for(;;){
     PE0 ^= 0x01;       // heartbeat
     Count1++;
+		
+		for(i=0; i < 100000; i++)
+		{ }
+		OS_ClearMsTime();
   }
 }
 void Thread2b(void){
