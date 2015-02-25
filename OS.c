@@ -22,7 +22,10 @@ void StartOS(void);
 #define MAILBOX_EMPTY	0
 #define MAILBOX_FULL	1
 
-#define NUMTHREADS 3
+#define FREE 0
+#define USED 1
+
+#define NUMTHREADS 6
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -31,6 +34,7 @@ struct tcb{
 	int32_t ID;
 	int32_t SleepCtr;
 	int32_t Priority;
+	int32_t MemStatus;
 };
 typedef struct tcb tcbType;
 tcbType tcbs[NUMTHREADS];
@@ -175,26 +179,68 @@ void OS_bSignal(Sema4Type *semaPt){
 // stack size must be divisable by 8 (aligned to double word boundary)
 // In Lab 2, you can ignore both the stackSize and priority fields
 // In Lab 3, you can ignore the stackSize fields
+uint32_t g_NumAliveThreads=0;
 int OS_AddThread(void(*task)(void), 
-  unsigned long stackSize, unsigned long priority){
-	static uint32_t i=0; 
+  unsigned long stackSize, unsigned long priority){ 
+	uint32_t k=0;
+//This implementation statically links threads depending on arbitrary order, and does not support dynamic adding and killing
+//	long status = StartCritical();
+//	if(i>NUMTHREADS){return 0;} //If max threads have been added return failure
+//	tcbs[i].ID=i;
+//	tcbs[i].Priority=priority;
+//	tcbs[i].SleepCtr=0;
+//	if(i>0){
+//		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
+//		 tcbs[i].previous=&tcbs[i-1]; //Create a back link from the thread we just left
+//		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
+//	}else{
+//		tcbs[0].next = &tcbs[i];
+//	}
+//	tcbs[0].previous = &tcbs[i];
+//  SetInitialStack(i); // initializes certain registers to arbitrary values
+//	Stacks[i][stackSize-2] = (int32_t)(task); // PC
+//	i++;
+//  EndCritical(status);
 	long status = StartCritical();
-	if(i>NUMTHREADS){return 0;} //If max threads have been added return failure
-	tcbs[i].ID=i;
-	tcbs[i].Priority=priority;
-	tcbs[i].SleepCtr=0;
-	if(i>0){
-		 tcbs[i-1].next = &tcbs[i];  //Set previously added thread's next to the thread just added
-		 tcbs[i].previous=&tcbs[i-1]; //Create a back link from the thread we just left
-		 tcbs[i].next = &tcbs[0];			//Set the thread just added's next to the first thread in the linked list
-	}else{
-		tcbs[0].next = &tcbs[i];
+	if(g_NumAliveThreads>NUMTHREADS){return 0;} //If max threads have been added return failure
+	tcbs[g_NumAliveThreads].ID=g_NumAliveThreads;
+  tcbs[g_NumAliveThreads].Priority=priority;
+	tcbs[g_NumAliveThreads].SleepCtr=0;
+	if(g_NumAliveThreads==0){
+		RunPt=&tcbs[0];     //First thread added at start of OS
+		tcbs[0].next=&tcbs[0];
+		tcbs[0].previous = &tcbs[0];
+		SetInitialStack(0); // initializes certain registers to arbitrary values
+		Stacks[0][stackSize-2] = (int32_t)(task); // PC
+		tcbs[0].MemStatus=USED;
+		g_NumAliveThreads++;
 	}
-	tcbs[0].previous = &tcbs[i];
-  SetInitialStack(i); // initializes certain registers to arbitrary values
-	Stacks[i][stackSize-2] = (int32_t)(task); // PC
-	i++;
-  EndCritical(status);
+	else if(g_NumAliveThreads==1){		//Second thread added to establish a circle
+		tcbs[0].previous = &tcbs[1];
+		tcbs[0].next = &tcbs[1];
+		tcbs[1].next = &tcbs[0];
+		tcbs[1].previous = &tcbs[0];
+		SetInitialStack(1); // initializes certain registers to arbitrary values
+		Stacks[1][stackSize-2] = (int32_t)(task); // PC
+		tcbs[1].MemStatus=USED;
+		g_NumAliveThreads++;
+	}
+	else{
+			for(k=0; k<NUMTHREADS; k++){
+			if(tcbs[k].MemStatus==FREE){
+				tcbs[k].next=RunPt->next;
+				RunPt->next->previous = &tcbs[k];
+				tcbs[k].previous=RunPt;
+				RunPt->next=&tcbs[k];
+				SetInitialStack(k); // initializes certain registers to arbitrary values
+				Stacks[k][stackSize-2] = (int32_t)(task); // PC
+				g_NumAliveThreads++;
+				tcbs[k].MemStatus=USED;
+				break;
+			}
+		}
+	}
+	EndCritical(status);
   return 1;               // successful;
 }
 
@@ -273,32 +319,32 @@ int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long prior
 void static DebounceTask(void){
 	uint32_t pin;
 	OS_Sleep(2);
-	pin = GPIO_PORTF_RIS_R|=0x11;
+	pin = GPIO_PORTF_RIS_R|=0x11;			//which switch to debounce?
 	if(pin==0x10){
-		LastPF4 = PF4;
-		GPIO_PORTF_ICR_R |= 0x10;
-		GPIO_PORTF_IM_R |= 0x10;
+		LastPF4 = PF4;									//Store current value of switch
+		GPIO_PORTF_ICR_R |= 0x10;				//acknowledge interrupt
+		GPIO_PORTF_IM_R |= 0x10;				//Re-arm interrupt
 		OS_Kill();
 	}
 	if(pin==0x01){
-		LastPF0 = PF0;
-		GPIO_PORTF_ICR_R |= 0x01;
-		GPIO_PORTF_IM_R |= 0x01;
+		LastPF0 = PF0;									//Store current value of switch 
+		GPIO_PORTF_ICR_R |= 0x01;				//acknowledge
+		GPIO_PORTF_IM_R |= 0x01;				//Re-arm
 		OS_Kill();
 	}
 }
 void GPIOPortF_Handler(void){
 	uint32_t pin;
-	pin = GPIO_PORTF_RIS_R|0x11;
+	pin = GPIO_PORTF_RIS_R|0x11;   //which switch triggered the interrupt?
 	if(pin==0x10){  //PF4 pressed
-		if(LastPF4==0){
-			(*PF4Task)();
+		if(LastPF4==0){				//If rising edge, execute user task
+			(*PF4Task)();		
 		}
 		GPIO_PORTF_IM_R &= ~0x10;	//disarm interrupt on PF4
 		OS_AddThread(&DebounceTask,128,1);
 	}
 	if(pin==0x01){
-		if(LastPF0==0){
+		if(LastPF0==0){				//If rising edge, execute user task
 			(*PF0Task)();
 		}
 		GPIO_PORTF_IM_R &= ~0x01;	//disarm interrupt on PF0
@@ -355,9 +401,9 @@ void OS_Sleep(unsigned long sleepTime){
 void OS_Kill(void){
 	
 	int32_t status;
+	status = StartCritical(); 
 	if(RunPt->next != RunPt) // keep one thread running at all times
 	{		
-		status = StartCritical();
 		RunPt->previous->next = RunPt->next; 
 		RunPt->next->previous = RunPt->previous;
 		// remove tcb from linked list by 
@@ -366,6 +412,7 @@ void OS_Kill(void){
 		
 		RunPt->sp = NULL;
 		// release reference to stack pointer
+		g_NumAliveThreads--;
 		EndCritical(status);
 		OS_Suspend();
 	}
@@ -569,7 +616,7 @@ unsigned long OS_MsTime(void)
 // In Lab 3, you should implement the user-defined TimeSlice field
 // It is ok to limit the range of theTimeSlice to match the 24-bit SysTick
 void OS_Launch(unsigned long theTimeSlice){
-	RunPt = &tcbs[0];       // thread 0 will run first
+	//RunPt = &tcbs[0];       // thread 0 will run first    This is done in OS_AddThread
 	#ifdef SYSTICK
 	NVIC_ST_CURRENT_R = 0;      // any write to current clears it
 	NVIC_ST_RELOAD_R = theTimeSlice - 1; // reload value
@@ -689,89 +736,27 @@ void Jitter(void){;}
 //__asm  
 void SysTick_Handler(void)
 {
-	// first decrement any sleeping threads
-	// assumed to interrupt on 2ms periodic intervals
-	int i;
-	int threadsAwakened;
 	int status;
 	tcbType* sleepIterator;
 	status = StartCritical();
 	
-	threadsAwakened = 0;
-#define SYSTICK_PERIOD 1	
+#define SYSTICK_PERIOD 1 //Systick interrupts every 1 ms so decrement sleep counters by 1 
 	
-	if(RunPt->SleepCtr > 0)
+	if(RunPt->SleepCtr > 0)			//if the sleep counter of the running thread is nonzero, decrement it
 	{
-		RunPt->SleepCtr--;
+		RunPt->SleepCtr -= SYSTICK_PERIOD;
 	}
 	for(sleepIterator = RunPt->next; sleepIterator != RunPt; sleepIterator = sleepIterator->next)
 	{
-		
+		//Iterate through the linked list until all sleeping threads have been decremented
 		if(sleepIterator->SleepCtr > 0)
 		{
 			sleepIterator->SleepCtr -= SYSTICK_PERIOD;
-		}
-//		
-//		
-//		// I am not sure whether we should hardcode the timeDifference
-//		// or use a function for it. the former is faster, the latter is 
-//		// more stable. If we change SysTick frequency we need to remember 
-//		// to change the hardcoded value too. or we could just use a variable 
-//		// and set it where we initialize systick. I will hardcode a macro for now
-//		tcbs[g_sleepingThreads[i]].SleepCtr -= SYSTICK_PERIOD;
-//		
-//		// come out of sleep state to the active thread state and put 
-//		// it back in round robin for the scheduler, where should it go???
-//		// Is there a preferrable way to do this? Run it first???
-//		//KL 2/21
-//		//We can leave sleeping threads in the linked list if we want and just execute
-//		//this everytime a Systick is called. This isn't the most efficient but I remember it was mentioned in class
-//		//for(0:number of threads){
-//		//	if(sleep_counter>=0)
-//		//    decrement sleep_counter
-//		// }
-//		// or schedulue based on the value of sleepCtr. e.g. if period is 5 ms
-//		// and we have 4 threads sleeping with sleepCtr = {4,3,2,1}
-//		// should we run the lowest sleepCtr value first???
-//		if(tcbs[g_sleepingThreads[i]].SleepCtr <= 0)
-//		{
-//			threadsAwakened++;
-//			// Add to scheduler
-//			// we also need to make sure there isn't an interrupt driven
-//			// periodic thread that is trying to access this value, need a mutex
-//			// problem is we would need one for each variable in each tcb not just 
-//			// one mutex for all of them, bc others could change if they aren't accessing
-//			// this particular sleepCtr. Or should we just StartCritical-EndCritical???
-//			//OS_bWait(&semaphoreSleep0) // need more, not sure how to do this
-//			// tcbs[g_sleepingThreads[i]].SleepCtr = 0;
-//			//OS_bSignal(&semaphoreSleep0);
-//		
-//			tcbs[g_sleepingThreads[i]].next = RunPt->next; // insert thread between current thread and next thread
-//			tcbs[g_sleepingThreads[i]].previous = RunPt; // give the added thread a next and previous tcb
-//			
-//			// update other tcbs in the Linked list
-//			RunPt->next->previous = &tcbs[g_sleepingThreads[i]];
-//			RunPt->next = &tcbs[g_sleepingThreads[i]];
-//		}			
+		}	
 	}
 
-	// moves RunPt to first Active thread
-//	while(RunPt->next->SleepCtr > 0)
-//	{
-//		// cant change RunPt bc only PendSV should be doing
-//		// context switches, only change the next/previous 
-//		//states for RunPt
-//		RunPt->next = RunPt->next->next;
-//	}
-	
-	
-	
-//	g_numSleepingThreads -= threadsAwakened; // update number of sleeping threads
-	
-	// next do the context switch - currently round robin
-	//PendSV_Handler();
 	EndCritical(status);
-	OS_Suspend();
+	OS_Suspend(); //context switch
 }
 	
 	

@@ -416,11 +416,7 @@ void Thread1b(void){
   Count1 = 0;          
   for(;;){
     PE0 ^= 0x01;       // heartbeat
-//		ST7735_Message (0, 0, "Thread ", 0);
     Count1++;
-		OS_Kill();
-		//OS_Sleep(0);
-		//for (i=0;i<10000;i++){}
   }
 }
 void Thread2b(void){
@@ -429,12 +425,7 @@ void Thread2b(void){
 	i = 0;
   for(;;){
     PE1 ^= 0x02;       // heartbeat
-//		ST7735_Message (0, 1, "Thread ", 1);
     Count2++;
-	//	OS_Sleep(00);
-		//for (i=0;i<100000;i++){}
-			PE1 = 0;
-			OS_Kill();
   }
 }
 void Thread3b(void){
@@ -442,14 +433,7 @@ void Thread3b(void){
   Count3 = 0;          
   for(;;){
     PE2 ^= 0x04;       // heartbeat
-//		ST7735_Message (0, 2, "Thread ", 2);
     Count3++;
-		
-		//OS_Sleep(7);
-	//	OS_Sleep(1000000);
-		//for (i=0;i<50000;i++){}
-			PE2 = 0x00;
-			OS_Kill();
   }
 }
 
@@ -457,14 +441,8 @@ void Thread4b(void){
 	int i;
   Count4 = 0;          
   for(;;){
-    PE3 ^= 0xFF;       // heartbeat
-//		ST7735_Message (0, 2, "Thread ", 2);
+    PE3 ^= 0x08;       // heartbeat
     Count4++;
-		
-		//OS_Sleep(9);
-		//for (i=0;i<10000;i++){}
-			PE3 = 0;
-			OS_Kill();
   }
 }
 
@@ -515,7 +493,7 @@ void Thread2c(void){
   Count2 = 0;    
   Count5 = 0;    // Count2 + Count5 should equal Count1  
   NumCreated += OS_AddThread(&Thread5c,128,3); 
-  OS_AddPeriodicThread(&BackgroundThread1c,1,TIME_1MS,0); 
+  OS_AddPeriodicThread(&BackgroundThread1c,1,1000,0); 
   for(;;){
     OS_Wait(&Readyc);
     Count2++;   // Count2 + Count5 should equal Count1
@@ -616,7 +594,9 @@ int Testmain4(void){   // Testmain4
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
   OS_AddPeriodicThread(&BackgroundThread1d,1,PERIOD,0); 
+
   OS_AddSwitchTasks(&BackgroundThread5d,&doNothing,2);
+
   NumCreated += OS_AddThread(&Thread2d,128,2); 
   NumCreated += OS_AddThread(&Thread3d,128,3); 
   NumCreated += OS_AddThread(&Thread4d,128,3); 
