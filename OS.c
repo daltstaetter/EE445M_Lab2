@@ -19,8 +19,8 @@ void EndCritical(int32_t primask);
 void PendSV_Handler(); // used for context switching in SysTick
 void StartOS(void);
 
-#define MAILBOX_EMPTY	0
-#define MAILBOX_FULL	1
+#define MAILBOX_EMPTY	1
+#define MAILBOX_FULL	0
 
 #define DATA_VALID 1
 #define DATA_NOT_VALID 0
@@ -496,8 +496,8 @@ int OS_Fifo_Put(unsigned long data)
 	unsigned long* nextPutPtr;
 	nextPutPtr = g_fifoPutPtr + 1;
 	
-	OS_Wait(&g_roomLeft);
-	OS_bWait(&g_fifoMutex); 
+	//OS_Wait(&g_roomLeft);
+	//OS_bWait(&g_fifoMutex); 
 	
 	if(nextPutPtr == &g_Fifo[g_FIFOSIZE])
 	{ //wrap

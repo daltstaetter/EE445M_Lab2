@@ -31,7 +31,7 @@
 #include <string.h> 
 #include "ifdef.h"
 
-extern int Interpreter(void);
+extern void Interpreter(void);
 
 //#define INTERPRETER // cleared in ifdef.h
 //#define TASKS // set in ifdef.h
@@ -321,7 +321,7 @@ unsigned long myId = OS_Id();
 
 void doNothing0(void)
 {
-	
+	;
 }
 
 #define FINAL
@@ -330,25 +330,26 @@ void doNothing0(void)
 int main(void){ 
   OS_Init();           // initialize, disable interrupts
   PortE_Init();
+	Output_Init();
   DataLost = 0;        // lost data between producer and consumer
   NumSamples = 0;
   MaxJitter = 0;       // in 1us units
 
-//********initialize communication channels
+//********initialize communication channel
   OS_MailBox_Init();
   OS_Fifo_Init(128);    // ***note*** 4 is not big enough*****
 
 //*******attach background tasks***********
-  OS_AddSwitchTasks(&SW1Push,&doNothing0,2);
+  //OS_AddSwitchTasks(&SW1Push,&doNothing0,2);
 //  OS_AddSW2Task(&SW2Push,2);  // add this line in Lab 3
 //  ADC_Init(4);  // sequencer 3, channel 4, PD3, sampling in DAS()											/*****Change ADC_Init********/
-  OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
+//  OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
 
   NumCreated = 0 ;
 // create initial foreground threads
-  NumCreated += OS_AddThread(&Interpreter,128,2); 
+  //NumCreated += OS_AddThread(&Interpreter,128,2); 
   NumCreated += OS_AddThread(&Consumer,128,1); 
-  NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
+  //NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
  
   OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes

@@ -38,7 +38,7 @@
 #include "ifdef.h"
 //#define INTERPRETER
 
-int Interpreter(void);
+void Interpreter(void);
 
 struct __FILE { int handle; /* Add whatever you need here */ };
 FILE __stdout;
@@ -109,7 +109,7 @@ int main2(void){
 }
 #ifdef INTERPRETER
 uint16_t TestBuffer[64];
-int Interpreter(void){
+void Interpreter(void){
 	char input_str[30];
 	int input_num,i,device,line;
 	int freq, numSamples;
