@@ -115,7 +115,7 @@ void Interpreter(void){
 	int freq, numSamples;
 	//PLL_Init();
 	UART_Init();              // initialize UART
-	Output_Init();						// initialize LCD
+	//Output_Init();						// initialize LCD
 	//GPIO_PortF_Init();				// initialize PortF
 	OutCRLF();
 	OutCRLF();

@@ -52,7 +52,10 @@ unsigned long NumSamples;   // incremented every ADC sample, in Producer
 #define RUNLENGTH (20*FS) // display results and quit when NumSamples==RUNLENGTH
 // 20-sec finite time experiment duration 
 
-#define PERIOD TIME_500US // DAS 2kHz sampling period in system time units
+//#define PERIOD TIME_500US // DAS 2kHz sampling period in system time units
+#define PERIOD 800000   //100 Hz
+//#define PERIOD 160000   // 500 Hz
+//#define PERIOD 80000    //1000 Hz
 long x[64],y[64];         // input and output arrays for FFT
 
 //---------------------User debugging-----------------------
@@ -124,7 +127,7 @@ void DAS(void)
     if(FilterWork > 1)
 		{    // ignore timing of first interrupt
       unsigned long diff = OS_TimeDifference(LastTime,thisTime);
-      
+			PE5 ^= 0x20;
 			jitter = (diff > PERIOD) ? (diff-PERIOD+4)/8:(PERIOD-diff+4)/8; // in 0.1 usec
 			
       if(jitter > MaxJitter)
@@ -148,11 +151,12 @@ void DAS(void)
 // one foreground task created with button push
 // foreground treads run for 2 sec and die
 // ***********ButtonWork*************
+extern int g_NumAliveThreads;
 void ButtonWork(void)
 {
 	unsigned long myId = OS_Id(); 
   PE1 ^= 0x02;
-  ST7735_Message(1,8,"NumCreated =",NumCreated); 
+  ST7735_Message(1,8,"NumCreated =",g_NumAliveThreads); 
   PE1 ^= 0x02;
   OS_Sleep(50);     // set this to sleep for 50msec
   ST7735_Message(1,9,"PIDWork     =",PIDWork);
@@ -343,14 +347,15 @@ int main(void){
 //*******attach background tasks***********
   OS_AddSwitchTasks(&SW1Push,&doNothing0,1);
 //  OS_AddSW2Task(&SW2Push,2);  // add this line in Lab 3
-  ADC_Open(5);  // sequencer 3, channel 5, PD2, sampling in DAS()											/*****Change ADC_Init********/
-	OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
+  
 
   NumCreated = 0 ;
 // create initial foreground threads
-  //NumCreated += OS_AddThread(&Interpreter,128,2); 
+  NumCreated += OS_AddThread(&Interpreter,128,2); 
   NumCreated += OS_AddThread(&Consumer,128,1); 
   NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
+	ADC_Open(10);  // sequencer 3, channel 10, PB4, sampling in DAS()											/*****Change ADC_Init********/
+	OS_AddPeriodicThread(&DAS,4,100,0); // 2 kHz real time sampling of PB4
  
   OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes

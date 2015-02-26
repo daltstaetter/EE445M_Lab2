@@ -237,8 +237,6 @@ void ADC_Collect(uint8_t channelNum, uint32_t fs, void(*task)(unsigned long)){
   ADC0_ACTSS_R |= 0x08;          // enable sample sequencer 3
   NVIC_PRI4_R = (NVIC_PRI4_R&0xFFFF00FF)|0x00004000; //priority 2
   NVIC_EN0_R = 1<<17;              // enable interrupt 17 in NVIC
-	//NumberOfSamples = numberOfSamples;
-	//Buffer = buffer
 	ADC_Task = task;
   EnableInterrupts();
 }
@@ -248,9 +246,7 @@ void ADC0Seq3_Handler(void){
 	long sr;
   ADC0_ISC_R = 0x08;          // acknowledge ADC sequence 3 completion
 	sr = StartCritical();
-  //Buffer[i] = ADC0_SSFIFO3_R;  // 12-bit result
  (*ADC_Task)(ADC0_SSFIFO3_R);
-	
 	if(NumSamples >= RUNLENGTH)
 	{
 		Status=1;							//ADC conversion complete
@@ -288,6 +284,8 @@ int ADC_Status(void){
 // SS3 interrupts: enabled but not promoted to controller
 void ADC_Open(uint32_t channelNum){ 
 	volatile uint32_t delay;
+	long sr;
+	sr = StartCritical();
   switch(channelNum){             // 1) activate clock
     case 0:
     case 1:
@@ -308,6 +306,9 @@ void ADC_Open(uint32_t channelNum){
   }
   delay = SYSCTL_RCGCGPIO_R;      // 2) allow time for clock to stabilize
   delay = SYSCTL_RCGCGPIO_R;
+	delay = SYSCTL_RCGCGPIO_R;
+	delay = SYSCTL_RCGCGPIO_R;
+	delay = SYSCTL_RCGCGPIO_R;
   switch(channelNum){
     case 0:                       //      Ain0 is on PE3
       GPIO_PORTE_DIR_R &= ~0x08;  // 3.0) make PE3 input
@@ -382,13 +383,16 @@ void ADC_Open(uint32_t channelNum){
       GPIO_PORTB_AMSEL_R |= 0x20; // 6.11) enable analog functionality on PB5
       break;
   }
-  SYSCTL_RCGC0_R |= 0x00010000;   // 7) activate ADC0 (legacy code)
-//  SYSCTL_RCGCADC_R |= 0x00000001; // 7) activate ADC0 (actually doesn't work)
-  delay = SYSCTL_RCGC0_R;         // 8) allow time for clock to stabilize
-  delay = SYSCTL_RCGC0_R;
-//  SYSCTL_RCGC0_R &= ~0x00000300;  // 9) configure for 125K (legacy code)
-  ADC0_PC_R &= ~0xF;              // 9) clear max sample rate field
-  ADC0_PC_R |= 0x1;               //    configure for 125K samples/sec
+  SYSCTL_RCGCADC_R |= 0x01;     // activate ADC0  
+
+  delay = SYSCTL_RCGCADC_R;         // 8) allow time for clock to stabilize
+  delay = SYSCTL_RCGCADC_R;
+	delay = SYSCTL_RCGCADC_R;
+	delay = SYSCTL_RCGCADC_R;
+	delay = SYSCTL_RCGCADC_R;
+
+  //ADC0_PC_R &= ~0xF;              // 9) clear max sample rate field
+  ADC0_PC_R |= 0x01;               //    configure for 125K samples/sec
   ADC0_SSPRI_R = 0x3210;          // 10) Sequencer 3 is lowest priority
   ADC0_ACTSS_R &= ~0x0008;        // 11) disable sample sequencer 3
   ADC0_EMUX_R &= ~0xF000;         // 12) seq3 is software trigger
@@ -397,6 +401,7 @@ void ADC_Open(uint32_t channelNum){
   ADC0_SSCTL3_R = 0x0006;         // 14) no TS0 D0, yes IE0 END0
   ADC0_IM_R &= ~0x0008;           // 15) disable SS3 interrupts
   ADC0_ACTSS_R |= 0x0008;         // 16) enable sample sequencer 3
+	EndCritical(sr);
 }
 
 

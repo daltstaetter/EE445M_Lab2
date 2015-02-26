@@ -28,7 +28,7 @@ void StartOS(void);
 #define FREE 0
 #define USED 1
 
-#define NUMTHREADS 10
+#define NUMTHREADS 6
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -89,9 +89,19 @@ void SetInitialStack(int i){
 // initialize OS controlled I/O: serial, ADC, systick, LaunchPad I/O and timers 
 // input:  none
 // output: none
+// Timer1 used for OS system time
 void OS_Init(void){
+	uint32_t delay;
 	OS_DisableInterrupts();
   PLL_Init();                 // set processor clock to 80 MHz
+	SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R1;   // activate timer1
+	delay = SYSCTL_RCGCTIMER_R;   // allow time to finish activating
+	TIMER1_CTL_R &= ~TIMER_CTL_TAEN; // disable TimerA0
+	TIMER1_CFG_R  = TIMER_CFG_32_BIT_TIMER; // configure for 32-bit mode
+	TIMER1_TAMR_R = TIMER_TAMR_TAMR_PERIOD;
+	TIMER1_TAILR_R = (0x01<<31)-1;
+	TIMER1_TAPR_R = 0; // set prescale = 0
+	TIMER1_CTL_R |= TIMER_CTL_TAEN; // disable TimerA0
 	#ifdef SYSTICK
   NVIC_ST_CTRL_R = 0;         // disable SysTick during setup
   NVIC_SYS_PRI3_R =(NVIC_SYS_PRI3_R & ~NVIC_SYS_PRI3_TICK_M)|(0x7 << NVIC_SYS_PRI3_TICK_S); // priority 7
@@ -126,6 +136,7 @@ void OS_Wait(Sema4Type *semaPt){
 	while(semaPt->Value <= 0)
 	{
 		OS_EnableInterrupts();
+		OS_Suspend();
 		OS_DisableInterrupts();
 	}
 	semaPt->Value = semaPt->Value - 1;
@@ -196,7 +207,7 @@ void OS_bSignal(Sema4Type *semaPt){
 uint32_t g_NumAliveThreads=0;
 int OS_AddThread(void(*task)(void), 
   unsigned long stackSize, unsigned long priority){ 
-	uint32_t k=0;
+	uint32_t k=0, first, second;
 //This implementation statically links threads depending on arbitrary order, and does not support dynamic adding and killing
 //	long status = StartCritical();
 //	if(i>NUMTHREADS){return 0;} //If max threads have been added return failure
@@ -216,6 +227,7 @@ int OS_AddThread(void(*task)(void),
 //	i++;
 //  EndCritical(status);
 	long status = StartCritical();
+	first = OS_Time();
 	if(g_NumAliveThreads>=NUMTHREADS){return 0;} //If max threads have been added return failure
 	tcbs[g_NumAliveThreads].ID=g_NumAliveThreads;
   tcbs[g_NumAliveThreads].Priority=priority;
@@ -267,6 +279,7 @@ int OS_AddThread(void(*task)(void),
 			}
 		}
 	}
+	second = OS_Time();
 	EndCritical(status);
   return 1;               // successful;
 }
@@ -417,6 +430,7 @@ int OS_AddSW2Task(void(*task)(void), unsigned long priority){
 // output: none
 // You are free to select the time resolution for this function
 // OS_Sleep(0) implements cooperative multitasking;
+
 void OS_Sleep(unsigned long sleepTime){
 	int32_t status;
 
@@ -439,12 +453,6 @@ void OS_Sleep(unsigned long sleepTime){
 // kill the currently running thread, release its TCB and stack
 // input:  none
 // output: none
-#define PE3  (*((volatile unsigned long *)0x40024020))
-void SafetyThread(void){
-	for(;;){
-			PE3^=0x08;
-	}
-}
 void OS_Kill(void){
 	
 	int32_t status;
@@ -501,6 +509,10 @@ void OS_Fifo_Init(unsigned long size)
 	g_Fifo = &Fifo[0];
 	g_fifoPutPtr = &g_Fifo[0];
 	g_fifoGetPtr = &g_Fifo[0];
+	
+	g_roomLeft.Value = g_FIFOSIZE;
+	g_dataAvailable.Value = 0;
+	g_fifoMutex.Value = 1; 
 }
 
 // ******** OS_Fifo_Put ************
@@ -517,8 +529,8 @@ int OS_Fifo_Put(unsigned long data)
 	unsigned long* nextPutPtr;
 	nextPutPtr = g_fifoPutPtr + 1;
 	
-	//OS_Wait(&g_roomLeft);
-	//OS_bWait(&g_fifoMutex); 
+//	OS_Wait(&g_roomLeft);
+//	OS_bWait(&g_fifoMutex); 
 	
 	if(nextPutPtr == &g_Fifo[g_FIFOSIZE])
 	{ //wrap
@@ -638,7 +650,7 @@ unsigned long OS_MailBox_Recv(void)
 unsigned long OS_Time(void)
 {
 	// assumes an 80 MHz Clock
-	return NVIC_ST_CURRENT_R;
+	return TIMER1_TAR_R;
 }
 
 // DA 2/22
@@ -655,7 +667,7 @@ unsigned long OS_TimeDifference(unsigned long start, unsigned long stop)
 	// when you roll over. Requires: start > end & that both have been
 	// read within the same SysTick Period
 	unsigned long diff;
-	diff = start - stop;
+	diff = (start - stop);
 	return diff;
 }
 
