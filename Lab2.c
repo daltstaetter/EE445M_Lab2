@@ -168,13 +168,14 @@ void ButtonWork(void)
 // background threads execute once and return
 void SW1Push(void)
 {
-  if(OS_MsTime() > 20)
+	NumCreated += OS_AddThread(&ButtonWork,128,4);
+  //if(OS_MsTime() > 20)
 	{ // debounce
-    if(OS_AddThread(&ButtonWork,100,4))
+    //if(OS_AddThread(&ButtonWork,128,4))
 		{
-      NumCreated++; 
+      //NumCreated++; 
     }
-    OS_ClearMsTime();  // at least 20ms between touches
+    //OS_ClearMsTime();  // at least 20ms between touches
   }
 }
 //************SW2Push*************
@@ -334,6 +335,7 @@ int main(void){
   DataLost = 0;        // lost data between producer and consumer
   NumSamples = 0;
   MaxJitter = 0;       // in 1us units
+	ST7735_Message(0,1,"hi",10);
 
 //********initialize communication channel
   OS_MailBox_Init();
