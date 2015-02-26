@@ -152,12 +152,12 @@ void ButtonWork(void)
 {
 	unsigned long myId = OS_Id(); 
   PE1 ^= 0x02;
-  ST7735_Message(1,0,"NumCreated =",NumCreated); 
+  ST7735_Message(1,8,"NumCreated =",NumCreated); 
   PE1 ^= 0x02;
   OS_Sleep(50);     // set this to sleep for 50msec
-  ST7735_Message(1,1,"PIDWork     =",PIDWork);
-  ST7735_Message(1,2,"DataLost    =",DataLost);
-  ST7735_Message(1,3,"Jitter 0.1us=",MaxJitter);
+  ST7735_Message(1,9,"PIDWork     =",PIDWork);
+  ST7735_Message(1,10,"DataLost    =",DataLost);
+  ST7735_Message(1,11,"Jitter 0.1us=",MaxJitter);
   PE1 ^= 0x02;
   OS_Kill();  // done, OS does not return from a Kill
 } 
@@ -168,15 +168,14 @@ void ButtonWork(void)
 // background threads execute once and return
 void SW1Push(void)
 {
-	NumCreated += OS_AddThread(&ButtonWork,128,4);
   //if(OS_MsTime() > 20)
-	{ // debounce
-    //if(OS_AddThread(&ButtonWork,128,4))
-		{
-      //NumCreated++; 
-    }
-    //OS_ClearMsTime();  // at least 20ms between touches
-  }
+	//{ // debounce
+   NumCreated += OS_AddThread(&ButtonWork,128,4);
+		//{
+     // NumCreated++; 
+    //}
+   // OS_ClearMsTime();  // at least 20ms between touches
+  //}
 }
 //************SW2Push*************
 // Called when SW2 Button pushed, Lab 3 only
@@ -184,7 +183,7 @@ void SW1Push(void)
 // background threads execute once and return
 void SW2Push(void){
   if(OS_MsTime() > 20){ // debounce
-    if(OS_AddThread(&ButtonWork,100,4)){
+    if(OS_AddThread(&ButtonWork,128,4)){
       NumCreated++; 
     }
     OS_ClearMsTime();  // at least 20ms between touches
@@ -229,7 +228,7 @@ void Consumer(void)
 	unsigned long data,DCcomponent;   // 12-bit raw ADC sample, 0 to 4095
 	unsigned long t;                  // time in 2.5 ms
 	unsigned long myId = OS_Id(); 
-  ADC_Collect(4, FS, &Producer); // start ADC sampling, channel 5, PD2, 400 Hz                /********Change ADC_Collect*****/
+  ADC_Collect(4, FS, &Producer); // start ADC sampling, channel 4, PD3, 400 Hz                /********Change ADC_Collect*****/
   NumCreated += OS_AddThread(&Display,128,0); 
   while(NumSamples < RUNLENGTH) 
 	{ 
@@ -253,12 +252,12 @@ void Consumer(void)
 // outputs: none
 void Display(void){ 
 unsigned long data,voltage;
-  ST7735_Message(0,1,"Run length = ",(RUNLENGTH)/FS);   // top half used for Display
+  ST7735_Message(0,0,"Run length = ",(RUNLENGTH)/FS);   // top half used for Display
   while(NumSamples < RUNLENGTH) { 
     data = OS_MailBox_Recv();
     voltage = 3000*data/4095;               // calibrate your device so voltage is in mV
     PE3 = 0x08;
-    ST7735_Message(0,2,"v(mV) =",voltage);  
+    ST7735_Message(0,1,"v(mV) =",voltage);  
     PE3 = 0x00;
   } 
   OS_Kill();  // done
@@ -293,7 +292,7 @@ unsigned long myId = OS_Id();
     }
     PIDWork++;        // calculation finished
   }
-  for(;;){ }          // done
+  for(;;){ PE4^=0x10;}          // done
 }
 //--------------end of Task 4-----------------------------
 
@@ -331,6 +330,7 @@ void doNothing0(void)
 int main(void){ 
   OS_Init();           // initialize, disable interrupts
   PortE_Init();
+	OS_InitSemaphore(&LCDmutex,1);
 	Output_Init();
   DataLost = 0;        // lost data between producer and consumer
   NumSamples = 0;
@@ -342,10 +342,10 @@ int main(void){
   OS_Fifo_Init(128);    // ***note*** 4 is not big enough*****
 
 //*******attach background tasks***********
-  //OS_AddSwitchTasks(&SW1Push,&doNothing0,2);
+  OS_AddSwitchTasks(&SW1Push,&doNothing0,1);
 //  OS_AddSW2Task(&SW2Push,2);  // add this line in Lab 3
-//  ADC_Init(4);  // sequencer 3, channel 4, PD3, sampling in DAS()											/*****Change ADC_Init********/
-//  OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
+  ADC_Open(5);  // sequencer 3, channel 5, PD2, sampling in DAS()											/*****Change ADC_Init********/
+	OS_AddPeriodicThread(&DAS,2,2000,0); // 2 kHz real time sampling of PD3
 
   NumCreated = 0 ;
 // create initial foreground threads
@@ -442,7 +442,7 @@ void Thread2b(void){
   for(;;){
     PE1 ^= 0x02;       // heartbeat
 		Mail_recv = OS_MailBox_Recv();
-		ST7735_Message(0,0,"Mail",Mail_recv);
+		//ST7735_Message(0,0,"Mail",Mail_recv);
     Count2++;
   }
 }
@@ -465,6 +465,7 @@ void Thread4b(void){
 int Switch1Count=0; 
 int Switch2Count=0;
  void DoNothing1(void){
+	 PE3^=0x08;
 	 Switch1Count++;
  }
  void DoNothing2(void){
