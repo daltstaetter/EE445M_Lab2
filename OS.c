@@ -178,13 +178,9 @@ void OS_bWait(Sema4Type *semaPt){
 // Lab3 wakeup blocked thread if appropriate 
 // input:  pointer to a binary semaphore
 // output: none
-void OS_bSignal(Sema4Type *semaPt){
-	
-	int32_t status;
-	
-	status = StartCritical();
-	semaPt->Value = 1;
-	EndCritical(status);
+void OS_bSignal(Sema4Type *semaPt)
+{
+	semaPt->Value = 1; // atomic
 }
 
 //******** OS_AddThread *************** 
@@ -505,6 +501,11 @@ void OS_Fifo_Init(unsigned long size)
 	g_Fifo = &Fifo[0];
 	g_fifoPutPtr = &g_Fifo[0];
 	g_fifoGetPtr = &g_Fifo[0];
+	
+	g_roomLeft.Value = g_FIFOSIZE;
+	g_dataAvailable.Value = 0;
+	g_fifoMutex.Value = 1;
+	
 }
 
 // ******** OS_Fifo_Put ************
@@ -521,8 +522,8 @@ int OS_Fifo_Put(unsigned long data)
 	unsigned long* nextPutPtr;
 	nextPutPtr = g_fifoPutPtr + 1;
 	
-	//OS_Wait(&g_roomLeft);
-	//OS_bWait(&g_fifoMutex); 
+	OS_Wait(&g_roomLeft);
+	OS_bWait(&g_fifoMutex); 
 	
 	if(nextPutPtr == &g_Fifo[g_FIFOSIZE])
 	{ //wrap
