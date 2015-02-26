@@ -1574,7 +1574,7 @@ void Output_Color(uint32_t newColor){ // Set color of future output
 }
 
 void ST7735_Message (int device, int line, char *string, long value){
-	//OS_bWait(&LCDmutex);
+	OS_bWait(&LCDmutex);
 	if(device==0){
 		if(line>7){
 			ST7735_SetCursor(0,0);
@@ -1609,5 +1609,5 @@ void ST7735_Message (int device, int line, char *string, long value){
 		ST7735_SetCursor(0,0);
 		ST7735_OutString((uint8_t*)"Invalid Device");
 	}
-	//OS_bSignal(&LCDmutex);
+	OS_bSignal(&LCDmutex);
 }

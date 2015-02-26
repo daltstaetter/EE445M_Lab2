@@ -28,7 +28,7 @@ void StartOS(void);
 #define FREE 0
 #define USED 1
 
-#define NUMTHREADS 8
+#define NUMTHREADS 10
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -216,7 +216,7 @@ int OS_AddThread(void(*task)(void),
 //	i++;
 //  EndCritical(status);
 	long status = StartCritical();
-	if(g_NumAliveThreads>NUMTHREADS){return 0;} //If max threads have been added return failure
+	if(g_NumAliveThreads>=NUMTHREADS){return 0;} //If max threads have been added return failure
 	tcbs[g_NumAliveThreads].ID=g_NumAliveThreads;
   tcbs[g_NumAliveThreads].Priority=priority;
 	tcbs[g_NumAliveThreads].SleepCtr=0;
@@ -229,28 +229,41 @@ int OS_AddThread(void(*task)(void),
 		tcbs[0].MemStatus=USED;
 		g_NumAliveThreads++;
 	}
-	else if(g_NumAliveThreads==1){		//Second thread added to establish a circle
-		tcbs[0].previous = &tcbs[1];
-		tcbs[0].next = &tcbs[1];
-		tcbs[1].next = &tcbs[0];
-		tcbs[1].previous = &tcbs[0];
-		SetInitialStack(1); // initializes certain registers to arbitrary values
-		Stacks[1][stackSize-2] = (int32_t)(task); // PC
-		tcbs[1].MemStatus=USED;
-		g_NumAliveThreads++;
-	}
+//	else if(g_NumAliveThreads==1){		//Second thread added to establish a circle
+//		tcbs[0].previous = &tcbs[1];
+//		tcbs[0].next = &tcbs[1];
+//		tcbs[1].next = &tcbs[0];
+//		tcbs[1].previous = &tcbs[0];
+//		SetInitialStack(1); // initializes certain registers to arbitrary values
+//		Stacks[1][stackSize-2] = (int32_t)(task); // PC
+//		tcbs[1].MemStatus=USED;
+//		g_NumAliveThreads++;
+//	}
 	else{
 			for(k=0; k<NUMTHREADS; k++){
 			if(tcbs[k].MemStatus==FREE){
-				tcbs[k].next=RunPt->next;
-				RunPt->next->previous = &tcbs[k];
-				tcbs[k].previous=RunPt;
-				RunPt->next=&tcbs[k];
-				SetInitialStack(k); // initializes certain registers to arbitrary values
-				Stacks[k][stackSize-2] = (int32_t)(task); // PC
-				g_NumAliveThreads++;
-				tcbs[k].MemStatus=USED;
-				break;
+				if(g_NumAliveThreads==1)
+				{
+					RunPt->previous=&tcbs[k];
+					RunPt->next = &tcbs[k];
+					tcbs[k].next=RunPt;
+					tcbs[k].previous=RunPt;
+					SetInitialStack(k);
+					Stacks[k][stackSize-2] = (int32_t)(task); // PC
+					g_NumAliveThreads++;
+					tcbs[k].MemStatus=USED;
+					break;
+				}else{
+					tcbs[k].next=RunPt->next;
+					RunPt->next->previous = &tcbs[k];
+					tcbs[k].previous=RunPt;
+					RunPt->next=&tcbs[k];
+					SetInitialStack(k); // initializes certain registers to arbitrary values
+					Stacks[k][stackSize-2] = (int32_t)(task); // PC
+					g_NumAliveThreads++;
+					tcbs[k].MemStatus=USED;
+					break;
+				}
 			}
 		}
 	}
@@ -426,12 +439,19 @@ void OS_Sleep(unsigned long sleepTime){
 // kill the currently running thread, release its TCB and stack
 // input:  none
 // output: none
+#define PE3  (*((volatile unsigned long *)0x40024020))
+void SafetyThread(void){
+	for(;;){
+			PE3^=0x08;
+	}
+}
 void OS_Kill(void){
 	
 	int32_t status;
 	status = StartCritical(); 
-	if(RunPt->next != RunPt) // keep one thread running at all times
+	if(RunPt->next!= RunPt) // keep one thread running at all times
 	{		
+	//Remove the currently running thread
 		RunPt->previous->next = RunPt->next; 
 		RunPt->next->previous = RunPt->previous;
 		// remove tcb from linked list by 
@@ -439,7 +459,7 @@ void OS_Kill(void){
 		// to the current node's nextPtr
 		
 		RunPt->sp = NULL;
-		tcbs[g_NumAliveThreads].MemStatus = FREE;
+		RunPt->MemStatus = FREE;
 		// release reference to stack pointer
 		g_NumAliveThreads--;
 		EndCritical(status);
