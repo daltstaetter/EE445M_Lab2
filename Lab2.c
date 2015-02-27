@@ -33,6 +33,7 @@
 
 extern void Interpreter(void);
 extern int g_NumAliveThreads;
+extern void Jitter(void);   // prints jitter information (write this)
 
 int32_t StartCritical(void);
 void EndCritical(int32_t primask);
