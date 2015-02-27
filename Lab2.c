@@ -32,6 +32,8 @@
 #include "ifdef.h"
 
 extern void Interpreter(void);
+int32_t StartCritical(void);
+void EndCritical(int32_t primask);
 
 //#define INTERPRETER // cleared in ifdef.h
 //#define TASKS // set in ifdef.h
@@ -118,16 +120,17 @@ void DAS(void)
   
 	if(NumSamples < RUNLENGTH)
 	{   // finite time run
+		int i;
     PE0 ^= 0x01;
     input = ADC_In();           // channel set when calling ADC_Init
     PE0 ^= 0x01;
     thisTime = OS_Time();       // current time, 12.5 ns
+		//for(i=0;i<=500;i++){}
     DASoutput = Filter(input);
     FilterWork++;        // calculation finished
     if(FilterWork > 1)
 		{    // ignore timing of first interrupt
       unsigned long diff = OS_TimeDifference(LastTime,thisTime);
-			PE5 ^= 0x20;
 			jitter = (diff > PERIOD) ? (diff-PERIOD+4)/8:(PERIOD-diff+4)/8; // in 0.1 usec
 			
       if(jitter > MaxJitter)
@@ -291,12 +294,13 @@ unsigned long myId = OS_Id();
   Coeff[1] = 128;   // 0.5 = 128/256 integral coefficient
   Coeff[2] = 64;    // 0.25 = 64/256 derivative coefficient*
   while(NumSamples < RUNLENGTH) { 
+		PE4^=0x10;
     for(err = -1000; err <= 1000; err++){    // made-up data
       Actuator = PID_stm32(err,Coeff)/256;
     }
     PIDWork++;        // calculation finished
   }
-  for(;;){ PE4^=0x10;}          // done
+  for(;;){ }          // done
 }
 //--------------end of Task 4-----------------------------
 
@@ -331,7 +335,7 @@ void doNothing0(void)
 #define FINAL
 #ifdef FINAL
 //*******************final user main DEMONTRATE THIS TO TA**********
-int main(void){ 
+int Testmain_final(void){ 
   OS_Init();           // initialize, disable interrupts
   PortE_Init();
 	OS_InitSemaphore(&LCDmutex,1);
@@ -507,12 +511,14 @@ int Testmain2(void){  // Testmain2
 Sema4Type Readyc;        // set in background
 int Lost;
 void BackgroundThread1c(void){   // called at 1000 Hz
+	PE0^=0x01;
   Count1++;
   OS_Signal(&Readyc);
 }
 void Thread5c(void){
   for(;;){
     OS_Wait(&Readyc);
+		PE1^=0x02;
     Count5++;   // Count2 + Count5 should equal Count1 
     Lost = Count1-Count5-Count2;
   }
@@ -526,6 +532,7 @@ void Thread2c(void){
   OS_AddPeriodicThread(&BackgroundThread1c,4,1000,0);
   for(;;){
     OS_Wait(&Readyc);
+		PE2^=0x04;
     Count2++;   // Count2 + Count5 should equal Count1
   }
 }
@@ -533,12 +540,14 @@ void Thread2c(void){
 void Thread3c(void){
   Count3 = 0;          
   for(;;){
+		PE3^=0x08;
     Count3++;
   }
 }
 void Thread4c(void){ int i;
   for(i=0;i<64;i++){
     Count4++;
+		PE4^=0x10;
     OS_Sleep(10);
   }
   OS_Kill();
@@ -552,7 +561,7 @@ void DoNothing(void){
 	;
 }
       
-int Testmain3(void){   // Testmain3
+int main(void){   // Testmain3
   Count4 = 0;          
   OS_Init();           // initialize, disable interrupts
 // Count2 + Count5 should equal Count1
@@ -586,6 +595,7 @@ static int i=0;
     i = 0;         //every 50 ms
     Count1++;
     OS_bSignal(&Readyd);
+		PE0^=0x01;
   }
 }
 void Thread2d(void){
@@ -594,6 +604,7 @@ void Thread2d(void){
   Count2 = 0;          
   for(;;){
     OS_bWait(&Readyd);
+		PE1^=0x02;
     Count2++;     
   }
 }
@@ -601,12 +612,14 @@ void Thread3d(void){
   Count3 = 0;          
   for(;;){
     Count3++;
+		PE2^=0x04;
   }
 }
 void Thread4d(void){ int i;
   for(i=0;i<640;i++){
     Count4++;
     OS_Sleep(1);
+		PE3^=0x08;
   }
   OS_Kill();
 }
@@ -617,13 +630,14 @@ void doNothing(void)
 }
 
 void BackgroundThread5d(void){   // called when Select button pushed
+	PE4^=0x10;
   NumCreated += OS_AddThread(&Thread4d,128,3); 
 }
 int Testmain4(void){   // Testmain4
   Count4 = 0;          
   OS_Init();           // initialize, disable interrupts
   NumCreated = 0 ;
-  OS_AddPeriodicThread(&BackgroundThread1d,2,1000,0); 
+  OS_AddPeriodicThread(&BackgroundThread1d,4,1000,0); //Timer
 
   OS_AddSwitchTasks(&BackgroundThread5d,&doNothing,2);
 

@@ -107,6 +107,7 @@ int main2(void){
 	ST7735_Message(0,0,"A",12345);
 	while(1){;}
 }
+#define PE4  (*((volatile unsigned long *)0x40024040))
 #ifdef INTERPRETER
 uint16_t TestBuffer[64];
 void Interpreter(void){
@@ -136,6 +137,7 @@ void Interpreter(void){
 	printf("OS-ST - OS_StopThread\n\r");
 	
 	while(1){
+		//PE4^=0x10;
 		printf("\n\rEnter a command:\n\r");
 		for(i=0;input_str[i]!=0;i++){input_str[i]=0;}		//Flush the input_str
 		UART_InString(input_str,30);

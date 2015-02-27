@@ -28,7 +28,7 @@ void StartOS(void);
 #define FREE 0
 #define USED 1
 
-#define NUMTHREADS 6
+#define NUMTHREADS 12
 #define STACKSIZE 128
 struct tcb{
 	int32_t *sp;
@@ -99,7 +99,7 @@ void OS_Init(void){
   PLL_Init();                 // set processor clock to 80 MHz
 	SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R1;   // activate timer1
 	delay = SYSCTL_RCGCTIMER_R;   // allow time to finish activating
-	TIMER1_CTL_R &= ~TIMER_CTL_TAEN; // disable TimerA0
+	TIMER1_CTL_R &= ~TIMER_CTL_TAEN; // disable TimerA1
 	TIMER1_CFG_R  = TIMER_CFG_32_BIT_TIMER; // configure for 32-bit mode
 	TIMER1_TAMR_R = TIMER_TAMR_TAMR_PERIOD;
 	TIMER1_TAILR_R = (0x01<<31)-1;
@@ -226,7 +226,6 @@ int OS_AddThread(void(*task)(void),
 //	i++;
 //  EndCritical(status);
 	long status = StartCritical();
-	first = OS_Time();
 	if(g_NumAliveThreads>=NUMTHREADS){return 0;} //If max threads have been added return failure
 	tcbs[g_NumAliveThreads].ID=g_NumAliveThreads;
   tcbs[g_NumAliveThreads].Priority=priority;
@@ -279,7 +278,7 @@ int OS_AddThread(void(*task)(void),
 			}
 		}
 	}
-	second = OS_Time();
+
 	EndCritical(status);
   return 1;               // successful;
 }
@@ -378,29 +377,32 @@ void static DebounceSW2Task(void){
 	GPIO_PORTF_IM_R |= 0x01;				//Re-arm
 	OS_Kill();
 }
+#define PE5  (*((volatile unsigned long *)0x40024080))
 int interrupt_count = 0;
 void GPIOPortF_Handler(void){
-	unsigned long sr;
 	uint32_t pin;
-	sr=StartCritical();
 	interrupt_count++;
 	pin = GPIO_PORTF_RIS_R&0x11;   //which switch triggered the interrupt?
 	GPIO_PORTF_ICR_R |= pin;				//acknowledge
+
 	if(pin==0x10){  //PF4 pressed
 		if(LastPF4==0x10){				//If rising edge, execute user task
 			(*PF4Task)();		
 		}
 		GPIO_PORTF_IM_R &= ~pin;	//disarm interrupt on PF4
-		OS_AddThread(&DebounceSW1Task,128,1);
+		if(OS_AddThread(&DebounceSW1Task,128,1)==0){
+			GPIO_PORTF_IM_R |= pin;
+		}
 	}
 	if(pin==0x01){
 		if(LastPF0==0x01){				//If rising edge, execute user task
 			(*PF0Task)();
 		}
 		GPIO_PORTF_IM_R &= ~pin;	//disarm interrupt on PF0
-		OS_AddThread(&DebounceSW2Task,128,1);
+		if(OS_AddThread(&DebounceSW2Task,128,1)==0){
+			GPIO_PORTF_IM_R |= pin;
+		}
 	}
-	EndCritical(sr);
 }
 //Ignore for now
 //******** OS_AddSW2Task *************** 
@@ -831,12 +833,12 @@ void PF3_Toggle(void)
 void Jitter(void){;}
 
 //__asm  
+
 void SysTick_Handler(void)
 {
 	int status;
 	tcbType* sleepIterator;
 	status = StartCritical();
-	
 #define SYSTICK_PERIOD 1 //Systick interrupts every 1 ms so decrement sleep counters by 1 
 	g_msTime += SYSTICK_PERIOD;
 	
@@ -854,7 +856,9 @@ void SysTick_Handler(void)
 	}
 
 	EndCritical(status);
+	PE5^=0xFF;
 	OS_Suspend(); //context switch
+	PE5^=0xFF;
 }
 	
 	
