@@ -52,8 +52,8 @@ unsigned long NumSamples;   // incremented every ADC sample, in Producer
 #define RUNLENGTH (20*FS) // display results and quit when NumSamples==RUNLENGTH
 // 20-sec finite time experiment duration 
 
-//#define PERIOD TIME_500US // DAS 2kHz sampling period in system time units
-#define PERIOD 800000   //100 Hz
+#define PERIOD TIME_500US // DAS 2kHz sampling period in system time units
+//#define PERIOD 800000   //100 Hz
 //#define PERIOD 160000   // 500 Hz
 //#define PERIOD 80000    //1000 Hz
 long x[64],y[64];         // input and output arrays for FFT
@@ -205,7 +205,7 @@ void SW2Push(void){
 
 //******** Producer *************** 
 // The Producer in this lab will be called from your ADC ISR
-// A timer runs at 400Hz, started by your ADC_Collect
+// A timer runs at 400Hz, started by your po
 // The timer triggers the ADC, creating the 400Hz sampling
 // Your ADC ISR runs when ADC data is ready
 // Your ADC ISR calls this function with a 12-bit sample 
@@ -355,7 +355,7 @@ int main(void){
   NumCreated += OS_AddThread(&Consumer,128,1); 
   NumCreated += OS_AddThread(&PID,128,3);  // Lab 3, make this lowest priority
 	ADC_Open(10);  // sequencer 3, channel 10, PB4, sampling in DAS()											/*****Change ADC_Init********/
-	OS_AddPeriodicThread(&DAS,4,100,0); // 2 kHz real time sampling of PB4
+	OS_AddPeriodicThread(&DAS,4,2000,0); // 2 kHz real time sampling of PB4, Timer2
  
   OS_Launch(TIME_2MS); // doesn't return, interrupts enabled in here
   return 0;            // this never executes

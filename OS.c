@@ -335,6 +335,8 @@ void (*PF4Task) (void);
 void (*PF0Task) (void);
 uint32_t static LastPF4, LastPF0;
 int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long priority){
+	long sr;
+	sr = StartCritical();
 	uint32_t delay;
 	SYSCTL_RCGCGPIO_R |= 0x00000020;  // activate clock for Port F
   delay = SYSCTL_RCGCGPIO_R;        // allow time for clock to start
@@ -357,35 +359,30 @@ int OS_AddSwitchTasks(void(*task1)(void), void(*task2)(void),unsigned long prior
 	LastPF0 = PF0;
 	NVIC_PRI7_R = (NVIC_PRI7_R&NVIC_PRI7_INT30_M)|(priority<<NVIC_PRI7_INT30_S);
 	NVIC_EN0_R = NVIC_EN0_INT30;
+	EndCritical(sr);
 	return 1;
 }
 
 void static DebounceSW1Task(void){
-	long sr;
 	OS_Sleep(2);
-	sr = StartCritical();
 	LastPF4 = PF4;									//Store current value of switch
 	GPIO_PORTF_ICR_R |= 0x10;				//acknowledge interrupt
 	GPIO_PORTF_IM_R |= 0x10;				//Re-arm interrupt
-	EndCritical(sr);
 	OS_Kill();
 }
 
 void static DebounceSW2Task(void){
-	long sr;
 	OS_Sleep(2);
-	sr = StartCritical();
 	LastPF0 = PF0;									//Store current value of switch
 	GPIO_PORTF_ICR_R |= 0x01;				//acknowledge
 	GPIO_PORTF_IM_R |= 0x01;				//Re-arm
-	EndCritical(sr);
 	OS_Kill();
 }
 int interrupt_count = 0;
 void GPIOPortF_Handler(void){
+	unsigned long sr;
 	uint32_t pin;
-	long sr;
-	sr = StartCritical();
+	sr=StartCritical();
 	interrupt_count++;
 	pin = GPIO_PORTF_RIS_R&0x11;   //which switch triggered the interrupt?
 	GPIO_PORTF_ICR_R |= pin;				//acknowledge

@@ -279,9 +279,9 @@ int ADC_Status(void){
 // Sequencer 1 priority: 2nd
 // Sequencer 2 priority: 3rd
 // Sequencer 3 priority: 4th (lowest)
-// SS3 triggering event: software trigger
-// SS3 1st sample source: programmable using variable 'channelNum' [0:11]
-// SS3 interrupts: enabled but not promoted to controller
+// SS0 triggering event: software trigger
+// SS0 1st sample source: programmable using variable 'channelNum' [0:11]
+// SS0 interrupts: enabled but not promoted to controller
 void ADC_Open(uint32_t channelNum){ 
 	volatile uint32_t delay;
 	long sr;
@@ -394,13 +394,13 @@ void ADC_Open(uint32_t channelNum){
   //ADC0_PC_R &= ~0xF;              // 9) clear max sample rate field
   ADC0_PC_R |= 0x01;               //    configure for 125K samples/sec
   ADC0_SSPRI_R = 0x3210;          // 10) Sequencer 3 is lowest priority
-  ADC0_ACTSS_R &= ~0x0008;        // 11) disable sample sequencer 3
-  ADC0_EMUX_R &= ~0xF000;         // 12) seq3 is software trigger
-  ADC0_SSMUX3_R &= ~0x000F;       // 13) clear SS3 field
-  ADC0_SSMUX3_R += channelNum;    //     set channel
-  ADC0_SSCTL3_R = 0x0006;         // 14) no TS0 D0, yes IE0 END0
-  ADC0_IM_R &= ~0x0008;           // 15) disable SS3 interrupts
-  ADC0_ACTSS_R |= 0x0008;         // 16) enable sample sequencer 3
+  ADC0_ACTSS_R &= ~0x0001;        // 11) disable sample sequencer 0
+  ADC0_EMUX_R &= ~0x000F;         // 12) seq0 is software trigger
+  ADC0_SSMUX0_R &= ~0x000F;       // 13) clear SS3 field
+  ADC0_SSMUX0_R += channelNum;    //     set channel
+  ADC0_SSCTL0_R = 0x0006;         // 14) no TS0 D0, yes IE0 END0
+  ADC0_IM_R &= ~0x0001;           // 15) disable SS0 interrupts
+  ADC0_ACTSS_R |= 0x0001;         // 16) enable sample sequencer 0
 	EndCritical(sr);
 }
 
@@ -412,9 +412,9 @@ void ADC_Open(uint32_t channelNum){
 // Output: 12-bit result of ADC conversion
 uint16_t ADC_In(void){  
 	uint32_t result;
-  ADC0_PSSI_R = 0x0008;            // 1) initiate SS3
-  while((ADC0_RIS_R&0x08)==0){};   // 2) wait for conversion done
+  ADC0_PSSI_R = 0x0001;            // 1) initiate SS0
+  while((ADC0_RIS_R&0x01)==0){};   // 2) wait for conversion done
     // if you have an A0-A3 revision number, you need to add an 8 usec wait here
-  result = ADC0_SSFIFO3_R&0xFFF;   // 3) read result
+  result = ADC0_SSFIFO0_R&0xFFF;   // 3) read result
   return result;
 }
