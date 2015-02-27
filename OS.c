@@ -47,6 +47,9 @@ int32_t g_sleepingThreads[NUMTHREADS];
 int32_t g_numSleepingThreads = 0;
 Sema4Type g_mailboxDataValid, g_mailboxFree;
 Sema4Type g_dataAvailable, g_roomLeft, g_fifoMutex;
+unsigned long g_msTime; // num of ms since SysTick has started counting
+
+
 
 #define FIFOMAXSIZE 128
 #define FIFO_SUCCESS 1
@@ -186,13 +189,9 @@ void OS_bWait(Sema4Type *semaPt){
 // Lab3 wakeup blocked thread if appropriate 
 // input:  pointer to a binary semaphore
 // output: none
-void OS_bSignal(Sema4Type *semaPt){
-	
-	int32_t status;
-	
-	status = StartCritical();
-	semaPt->Value = 1;
-	EndCritical(status);
+void OS_bSignal(Sema4Type *semaPt)
+{
+	semaPt->Value = 1; // atomic
 }
 
 //******** OS_AddThread *************** 
@@ -241,6 +240,7 @@ int OS_AddThread(void(*task)(void),
 		tcbs[0].MemStatus=USED;
 		g_NumAliveThreads++;
 	}
+
 //	else if(g_NumAliveThreads==1){		//Second thread added to establish a circle
 //		tcbs[0].previous = &tcbs[1];
 //		tcbs[0].next = &tcbs[1];
@@ -677,13 +677,16 @@ unsigned long OS_TimeDifference(unsigned long start, unsigned long stop)
 // You are free to change how this works
 void OS_ClearMsTime(void)
 {
-	int32_t status = StartCritical();
+	//int32_t status = StartCritical();
 	// Need to do this for SysTick since that
 	// is what we are using for the system time
 	// any write to NVIC_ST_CURRENT_R resets it to the
 	// NVIC_ST_RELOAD_R value
-	NVIC_ST_CURRENT_R = 10;
-	EndCritical(status);
+	//NVIC_ST_CURRENT_R = 10;
+	//EndCritical(status);
+	
+	g_msTime = 0; // atomic
+	
 }
 
 // ******** OS_MsTime ************
@@ -693,16 +696,9 @@ void OS_ClearMsTime(void)
 // You are free to select the time resolution for this function
 // It is ok to make the resolution to match the first call to OS_AddPeriodicThread
 unsigned long OS_MsTime(void)
-{ // this is the msTime since the last systick interrupt
-	int32_t status;
-	unsigned long msTimeDiff;
-	status = StartCritical();
-	
-	msTimeDiff = OS_TimeDifference(NVIC_ST_RELOAD_R,NVIC_ST_CURRENT_R);
-	msTimeDiff = (msTimeDiff + 40000)/80000; // gives a resolution of ms 80MHz/80kHz = 1000
-		
-	EndCritical(status);
-	return msTimeDiff; // it actually is in ms
+{ // this is the msTime since SysTick has started counting
+	// It only updates when SysTick interrupts occur
+	return g_msTime; // it actually is in ms
 }
 
 //******** OS_Launch *************** 
@@ -842,6 +838,7 @@ void SysTick_Handler(void)
 	status = StartCritical();
 	
 #define SYSTICK_PERIOD 1 //Systick interrupts every 1 ms so decrement sleep counters by 1 
+	g_msTime += SYSTICK_PERIOD;
 	
 	if(RunPt->SleepCtr > 0)			//if the sleep counter of the running thread is nonzero, decrement it
 	{

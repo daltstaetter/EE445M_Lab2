@@ -340,6 +340,7 @@ int main(void){
   NumSamples = 0;
   MaxJitter = 0;       // in 1us units
 
+
 //********initialize communication channel
   OS_MailBox_Init();
   OS_Fifo_Init(128);    // ***note*** 4 is not big enough*****
